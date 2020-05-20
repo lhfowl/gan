@@ -31,6 +31,7 @@ from tensorflow_gan.examples.self_attention_estimator import estimator_lib as es
 from tensorflow_gan.examples.self_attention_estimator import eval_lib
 from tensorflow_gan.examples.self_attention_estimator import generator as gen_module
 
+from tensorflow_gan.examples.self_attention_estimator.constants import IMG_SIZE, VAL_SPLIT
 
 HParams = collections.namedtuple(
     'HParams',
@@ -75,7 +76,7 @@ TPUParams = collections.namedtuple(
 
 def _verify_dataset_shape(ds, z_dim):
   noise_shape = tf.TensorShape([None, z_dim])
-  img_shape = tf.TensorShape([None, 128, 128, 3])
+  img_shape = tf.TensorShape([None, IMG_SIZE, IMG_SIZE, 3])
   lbl_shape = tf.TensorShape([None])
 
   ds_shape = tf.compat.v1.data.get_output_shapes(ds)
@@ -87,7 +88,7 @@ def _verify_dataset_shape(ds, z_dim):
 def train_eval_input_fn(mode, params):
   """Mode-aware input function."""
   is_train = mode == tf.estimator.ModeKeys.TRAIN
-  split = 'train' if is_train else 'validation'
+  split = 'train' if is_train else VAL_SPLIT
 
   if params['tpu_params'].use_tpu_estimator:
     bs = params['batch_size']
@@ -102,7 +103,7 @@ def train_eval_input_fn(mode, params):
     fake_noise = tf.zeros([bs, params['z_dim']])
     if mode == tf.estimator.ModeKeys.PREDICT:
       return tf.data.Dataset.from_tensors(fake_noise).repeat()
-    fake_imgs = tf.zeros([bs, 128, 128, 3])
+    fake_imgs = tf.zeros([bs, IMG_SIZE, IMG_SIZE, 3])
     fake_lbls = tf.zeros([bs], dtype=tf.int32)
     ds = tf.data.Dataset.from_tensors(
         (fake_noise, {'images': fake_imgs, 'labels': fake_lbls}))
@@ -244,7 +245,7 @@ def _get_generator(hparams):
     gen_sparse_class.shape.assert_is_compatible_with([None])
 
     if hparams.debug_params.fake_nets:
-      gen_imgs = tf.zeros([batch_size, 128, 128, 3
+      gen_imgs = tf.zeros([batch_size, IMG_SIZE, IMG_SIZE, 3
                           ]) * tf.compat.v1.get_variable(
                               'dummy_g', initializer=2.0)
       generator_vars = ()
@@ -261,7 +262,7 @@ def _get_generator(hparams):
         hparams.tpu_params.use_tpu_estimator)
     eval_lib.log_and_summarize_variables(generator_vars, 'gvars',
                                          hparams.tpu_params.use_tpu_estimator)
-    gen_imgs.shape.assert_is_compatible_with([None, 128, 128, 3])
+    gen_imgs.shape.assert_is_compatible_with([None, IMG_SIZE, IMG_SIZE, 3])
 
     if mode == tf.estimator.ModeKeys.PREDICT:
       return gen_imgs

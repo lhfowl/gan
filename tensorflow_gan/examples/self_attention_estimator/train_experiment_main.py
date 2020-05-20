@@ -29,6 +29,7 @@ from absl import app
 from absl import flags
 from tensorflow_gan.examples.self_attention_estimator import train_experiment
 
+from tensorflow_gan.examples.self_attention_estimator.constants import NUM_CLASSES
 
 flags.DEFINE_string('model_dir', '/tmp/tfgan_logdir/sagan-estimator',
                     'Optional location to save model. If `None`, use a '
@@ -107,7 +108,7 @@ def main(_):
       beta1=FLAGS.beta1,
       gf_dim=FLAGS.gf_dim,
       df_dim=FLAGS.df_dim,
-      num_classes=1000,
+      num_classes=NUM_CLASSES,
       shuffle_buffer_size=10000,
       z_dim=FLAGS.z_dim,
       model_dir=FLAGS.model_dir,

@@ -25,7 +25,7 @@ import tensorflow_datasets as tfds
 
 from tensorflow_gan.examples import compat_utils
 
-IMG_SIZE = 128
+from tensorflow_gan.examples.self_attention_estimator.constants import IMG_SIZE
 
 flags.DEFINE_string('imagenet_data_dir', None,
                     'A directory for TFDS ImageNet. If `None`, use default.')
@@ -44,7 +44,7 @@ def provide_dataset(batch_size, shuffle_buffer_size, split='train'):
     A dataset of num_batches batches of size batch_size of images and labels.
   """
   shuffle = (split in ['train', tfds.Split.TRAIN])
-  dataset = _load_imagenet_dataset(split, flags.FLAGS.imagenet_data_dir,
+  dataset = _load_stl_dataset(split, flags.FLAGS.imagenet_data_dir,
                                    shuffle_files=shuffle)
   if shuffle:
     dataset = dataset.apply(
@@ -92,6 +92,10 @@ def provide_data(batch_size,
 
 def _load_imagenet_dataset(split, data_dir=None, shuffle_files=False):
   return tfds.load('imagenet2012', split=split, data_dir=data_dir,
+                   shuffle_files=shuffle_files)
+                   
+def _load_stl_dataset(split, data_dir=None, shuffle_files=False):
+  return tfds.load('stl10', split=split, data_dir=data_dir,
                    shuffle_files=shuffle_files)
 
 

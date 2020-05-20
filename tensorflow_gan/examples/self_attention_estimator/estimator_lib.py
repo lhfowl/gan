@@ -26,6 +26,7 @@ import tensorflow as tf
 from tensorflow_gan.examples.self_attention_estimator import eval_lib
 import tensorflow_gan as tfgan  # tf
 
+from tensorflow_gan.examples.self_attention_estimator.constants import IMG_SIZE
 
 def get_tpu_run_config_from_hparams(hparams):
   """Create a TPU-suitable RunConfig from HParams."""
@@ -188,14 +189,14 @@ def _generator_summary_ops(generated_images, real_images):
       tfgan.eval.image_grid(
           real_images[:16],
           grid_shape=(4, 4),
-          image_shape=(128, 128),
+          image_shape=(IMG_SIZE, IMG_SIZE),
           num_channels=3))
   gen_img_grid = tf.compat.v1.summary.image(
       'generated_images_grid',
       tfgan.eval.image_grid(
           generated_images[:16],
           grid_shape=(4, 4),
-          image_shape=(128, 128),
+          image_shape=(IMG_SIZE, IMG_SIZE),
           num_channels=3))
   return {
       'images/real': (real_img_summ, tf.no_op()),
