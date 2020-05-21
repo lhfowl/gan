@@ -40,6 +40,10 @@ from __future__ import print_function
 import tensorflow as tf
 from tensorflow_gan.python import contrib_utils as contrib
 
+from absl import flags
+
+import pdb
+
 
 __all__ = [
     'acgan_discriminator_loss',
@@ -299,19 +303,21 @@ def acgan_discriminator_loss(
   Raises:
     TypeError: If the discriminator does not output a tuple.
   """
+  one_hot_labels_real = one_hot_labels[:,:flags.FLAGS.num_classes]
+  one_hot_labels_gen = one_hot_labels[:,flags.FLAGS.num_classes:]
   with tf.compat.v1.name_scope(
       scope, 'acgan_discriminator_loss',
       (discriminator_real_classification_logits,
        discriminator_gen_classification_logits, one_hot_labels)) as scope:
     loss_on_generated = tf.compat.v1.losses.softmax_cross_entropy(
-        one_hot_labels,
+        one_hot_labels_gen,
         discriminator_gen_classification_logits,
         weights=generated_weights,
         scope=scope,
         loss_collection=None,
         reduction=reduction)
     loss_on_real = tf.compat.v1.losses.softmax_cross_entropy(
-        one_hot_labels,
+        one_hot_labels_real,
         discriminator_real_classification_logits,
         weights=real_weights,
         label_smoothing=label_smoothing,
@@ -369,6 +375,7 @@ def acgan_generator_loss(
     ValueError: if arg module not either `generator` or `discriminator`
     TypeError: if the discriminator does not output a tuple.
   """
+  one_hot_labels = one_hot_labels[:,flags.FLAGS.num_classes:]
   with tf.compat.v1.name_scope(
       scope, 'acgan_generator_loss',
       (discriminator_gen_classification_logits, one_hot_labels)) as scope:

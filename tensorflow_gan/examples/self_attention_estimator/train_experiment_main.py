@@ -27,9 +27,6 @@ from __future__ import print_function
 
 from absl import app
 from absl import flags
-from tensorflow_gan.examples.self_attention_estimator import train_experiment
-
-from tensorflow_gan.examples.self_attention_estimator.constants import NUM_CLASSES
 
 flags.DEFINE_string('model_dir', '/tmp/tfgan_logdir/sagan-estimator',
                     'Optional location to save model. If `None`, use a '
@@ -93,11 +90,34 @@ flags.DEFINE_integer(
     'tpu_iterations_per_loop', 1000,
     'Steps per interior TPU loop. Should be less than '
     '--train_steps_per_eval.')
+    
+# MHingeGAN
+flags.DEFINE_integer(
+    'image_size', 32,
+    'The size of the images in the dataset.')
+flags.DEFINE_string('dataset_val_split_name', 'test',
+    'For the datset that is being used, the name of the '
+    'split that should be used for validation. In imagenet it is "validation",'
+    'other times it is "test".')
+flags.DEFINE_integer(
+    'num_classes', 10,
+    'The number of classes in the dataset.')
+flags.DEFINE_string('data_dir', None,
+                    'A directory for a TFDS datset. If `None`, use default.')
+flags.DEFINE_string('dataset_name', 'imagenet2012',
+                    'Which dataset to use. imagenet2012 is default.')
+flags.DEFINE_float('aux_cond_generator_weight', 1.0,
+                   'default is None.')
+flags.DEFINE_float('aux_cond_discriminator_weight', 1.0, 
+                   'default is None.')
 
 FLAGS = flags.FLAGS
 
 
+
 def main(_):
+  from tensorflow_gan.examples.self_attention_estimator import train_experiment
+    
   tpu_location = FLAGS.tpu
   hparams = train_experiment.HParams(
       train_batch_size=FLAGS.train_batch_size,
@@ -108,7 +128,7 @@ def main(_):
       beta1=FLAGS.beta1,
       gf_dim=FLAGS.gf_dim,
       df_dim=FLAGS.df_dim,
-      num_classes=NUM_CLASSES,
+      num_classes=FLAGS.num_classes,
       shuffle_buffer_size=10000,
       z_dim=FLAGS.z_dim,
       model_dir=FLAGS.model_dir,

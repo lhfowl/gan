@@ -27,7 +27,8 @@ import tensorflow as tf
 from tensorflow_gan.examples.self_attention_estimator import data_provider
 import tensorflow_gan as tfgan  # tf
 
-from tensorflow_gan.examples.self_attention_estimator.constants import VAL_SPLIT
+from absl import flags
+
 
 def get_activations(get_images_fn, num_batches, get_logits=False):
   """Get Inception activations.
@@ -74,7 +75,7 @@ def get_activations_from_dataset(image_ds, num_batches, get_logits=False):
 def get_real_activations(batch_size,
                          num_batches,
                          shuffle_buffer_size=100000,
-                         split=VAL_SPLIT,
+                         split=flags.FLAGS.dataset_val_split_name,
                          get_logits=False):
   """Fetches batches inception pools and images.
 

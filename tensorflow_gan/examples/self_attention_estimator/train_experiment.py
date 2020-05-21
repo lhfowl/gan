@@ -31,7 +31,9 @@ from tensorflow_gan.examples.self_attention_estimator import estimator_lib as es
 from tensorflow_gan.examples.self_attention_estimator import eval_lib
 from tensorflow_gan.examples.self_attention_estimator import generator as gen_module
 
-from tensorflow_gan.examples.self_attention_estimator.constants import IMG_SIZE, VAL_SPLIT
+from absl import flags
+
+import pdb
 
 HParams = collections.namedtuple(
     'HParams',
@@ -76,7 +78,7 @@ TPUParams = collections.namedtuple(
 
 def _verify_dataset_shape(ds, z_dim):
   noise_shape = tf.TensorShape([None, z_dim])
-  img_shape = tf.TensorShape([None, IMG_SIZE, IMG_SIZE, 3])
+  img_shape = tf.TensorShape([None, flags.FLAGS.image_size, flags.FLAGS.image_size, 3])
   lbl_shape = tf.TensorShape([None])
 
   ds_shape = tf.compat.v1.data.get_output_shapes(ds)
@@ -88,7 +90,7 @@ def _verify_dataset_shape(ds, z_dim):
 def train_eval_input_fn(mode, params):
   """Mode-aware input function."""
   is_train = mode == tf.estimator.ModeKeys.TRAIN
-  split = 'train' if is_train else VAL_SPLIT
+  split = 'train' if is_train else flags.FLAGS.dataset_val_split_name
 
   if params['tpu_params'].use_tpu_estimator:
     bs = params['batch_size']
@@ -103,7 +105,7 @@ def train_eval_input_fn(mode, params):
     fake_noise = tf.zeros([bs, params['z_dim']])
     if mode == tf.estimator.ModeKeys.PREDICT:
       return tf.data.Dataset.from_tensors(fake_noise).repeat()
-    fake_imgs = tf.zeros([bs, IMG_SIZE, IMG_SIZE, 3])
+    fake_imgs = tf.zeros([bs, flags.FLAGS.image_size, flags.FLAGS.image_size, 3])
     fake_lbls = tf.zeros([bs], dtype=tf.int32)
     ds = tf.data.Dataset.from_tensors(
         (fake_noise, {'images': fake_imgs, 'labels': fake_lbls}))
@@ -245,7 +247,7 @@ def _get_generator(hparams):
     gen_sparse_class.shape.assert_is_compatible_with([None])
 
     if hparams.debug_params.fake_nets:
-      gen_imgs = tf.zeros([batch_size, IMG_SIZE, IMG_SIZE, 3
+      gen_imgs = tf.zeros([batch_size, flags.FLAGS.image_size, flags.FLAGS.image_size, 3
                           ]) * tf.compat.v1.get_variable(
                               'dummy_g', initializer=2.0)
       generator_vars = ()
@@ -262,7 +264,7 @@ def _get_generator(hparams):
         hparams.tpu_params.use_tpu_estimator)
     eval_lib.log_and_summarize_variables(generator_vars, 'gvars',
                                          hparams.tpu_params.use_tpu_estimator)
-    gen_imgs.shape.assert_is_compatible_with([None, IMG_SIZE, IMG_SIZE, 3])
+    gen_imgs.shape.assert_is_compatible_with([None, flags.FLAGS.image_size, flags.FLAGS.image_size, 3])
 
     if mode == tf.estimator.ModeKeys.PREDICT:
       return gen_imgs
@@ -280,12 +282,16 @@ def _get_discriminator(hparams):
     if hparams.debug_params.fake_nets:
       # Need discriminator variables and to depend on the generator.
       logits = tf.zeros(
-          [tf.shape(input=images)[0], 20]) * tf.compat.v1.get_variable(
+          [tf.shape(input=images)[0], 1]) * tf.compat.v1.get_variable(
               'dummy_d', initializer=2.0) * tf.reduce_mean(input_tensor=images)
+      class_logits = tf.zeros(
+          [tf.shape(input=images)[0], 10]) * tf.compat.v1.get_variable(
+              'dummy_d2', initializer=2.0) * tf.reduce_mean(input_tensor=images)
+      
       discriminator_vars = ()
     else:
       num_trainable_variables = len(tf.compat.v1.trainable_variables())
-      logits, discriminator_vars = dis_module.discriminator(
+      logits, class_logits, discriminator_vars = dis_module.discriminator(
           images, labels, hparams.df_dim, hparams.num_classes)
       if num_trainable_variables != len(tf.compat.v1.trainable_variables()):
         # Log the generated variables only in the first time the function is
@@ -294,6 +300,7 @@ def _get_discriminator(hparams):
         eval_lib.log_and_summarize_variables(
             discriminator_vars, 'dvars', hparams.tpu_params.use_tpu_estimator)
     logits.shape.assert_is_compatible_with([None, None])
-    return logits
+    
+    return logits, class_logits
 
   return discriminator

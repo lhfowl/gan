@@ -30,6 +30,10 @@ from tensorflow_gan.python import namedtuples as tfgan_tuples
 from tensorflow_gan.python import train as tfgan_train
 from tensorflow_gan.python.eval import summaries as tfgan_summaries
 
+from absl import flags
+
+import pdb
+
 
 __all__ = [
     'GANEstimator',
@@ -186,6 +190,7 @@ class GANEstimator(tf.estimator.Estimator):
       real_data = labels  # rename inputs for clarity
       generator_inputs = features  # rename inputs for clarity
 
+      
       # Make GANModel, which encapsulates the GAN model architectures.
       gan_model = get_gan_model(mode, generator_fn, discriminator_fn, real_data,
                                 generator_inputs, add_summaries)
@@ -261,11 +266,13 @@ def _make_gan_model(generator_fn, discriminator_fn, real_data, generator_inputs,
     generator_fn = functools.partial(generator_fn, mode=mode)
   if 'mode' in inspect.getargspec(discriminator_fn).args:
     discriminator_fn = functools.partial(discriminator_fn, mode=mode)
-  gan_model = tfgan_train.gan_model(
+  # pdb.set_trace() # one
+  gan_model = tfgan_train.acgan_model(
       generator_fn,
       discriminator_fn,
       real_data,
       generator_inputs,
+      one_hot_labels=tf.one_hot(real_data['labels'], 2*flags.FLAGS.num_classes),
       generator_scope=generator_scope,
       discriminator_scope=discriminator_scope,
       check_shapes=False)

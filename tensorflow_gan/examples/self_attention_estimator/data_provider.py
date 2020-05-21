@@ -25,10 +25,7 @@ import tensorflow_datasets as tfds
 
 from tensorflow_gan.examples import compat_utils
 
-from tensorflow_gan.examples.self_attention_estimator.constants import IMG_SIZE
 
-flags.DEFINE_string('imagenet_data_dir', None,
-                    'A directory for TFDS ImageNet. If `None`, use default.')
 
 
 def provide_dataset(batch_size, shuffle_buffer_size, split='train'):
@@ -44,14 +41,14 @@ def provide_dataset(batch_size, shuffle_buffer_size, split='train'):
     A dataset of num_batches batches of size batch_size of images and labels.
   """
   shuffle = (split in ['train', tfds.Split.TRAIN])
-  dataset = _load_stl_dataset(split, flags.FLAGS.imagenet_data_dir,
+  dataset = _load_dataset(split, flags.FLAGS.data_dir,
                                    shuffle_files=shuffle)
   if shuffle:
     dataset = dataset.apply(
         tf.data.experimental.shuffle_and_repeat(shuffle_buffer_size))
   else:
     dataset = dataset.repeat()
-  dataset = (dataset.map(_preprocess_dataset_record_fn(IMG_SIZE),
+  dataset = (dataset.map(_preprocess_dataset_record_fn(flags.FLAGS.image_size),
                          num_parallel_calls=16 if shuffle else None)
              .batch(batch_size, drop_remainder=True))
   dataset = dataset.prefetch(tf.data.experimental.AUTOTUNE)
@@ -81,7 +78,7 @@ def provide_data(batch_size,
   iterator = tf.compat.v1.data.make_one_shot_iterator(dataset)
   images, labels = iterator.get_next()
   images = tf.reshape(
-      images, shape=[num_batches, batch_size, IMG_SIZE, IMG_SIZE, 3])
+      images, shape=[num_batches, batch_size, flags.FLAGS.image_size, flags.FLAGS.image_size, 3])
   labels = tf.reshape(labels, shape=[num_batches, batch_size, 1])
   batches = list(
       zip(
@@ -90,12 +87,8 @@ def provide_data(batch_size,
   return batches
 
 
-def _load_imagenet_dataset(split, data_dir=None, shuffle_files=False):
-  return tfds.load('imagenet2012', split=split, data_dir=data_dir,
-                   shuffle_files=shuffle_files)
-                   
-def _load_stl_dataset(split, data_dir=None, shuffle_files=False):
-  return tfds.load('stl10', split=split, data_dir=data_dir,
+def _load_dataset(split, data_dir=None, shuffle_files=False):
+  return tfds.load(flags.FLAGS.dataset_name, split=split, data_dir=data_dir,
                    shuffle_files=shuffle_files)
 
 

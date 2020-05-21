@@ -42,6 +42,10 @@ from tensorflow_gan.python import namedtuples
 from tensorflow_gan.python.losses import losses_wargs
 from tensorflow_gan.python.losses import tuple_losses
 
+from absl import flags
+
+import pdb
+
 __all__ = [
     'gan_model',
     'infogan_model',
@@ -288,12 +292,14 @@ def acgan_model(
       (discriminator_gen_outputs, discriminator_gen_classification_logits
       ) = _validate_acgan_discriminator_outputs(
           discriminator_fn(generated_data, generator_inputs))
+  # pdb.set_trace()
   with tf.compat.v1.variable_scope(dis_scope, reuse=True):
     with tf.compat.v1.name_scope(dis_scope.name + '/real/'):
-      real_data = tf.convert_to_tensor(value=real_data)
+      real_data = _convert_tensor_or_l_or_d(real_data)
       (discriminator_real_outputs, discriminator_real_classification_logits
       ) = _validate_acgan_discriminator_outputs(
           discriminator_fn(real_data, generator_inputs))
+  
   if check_shapes:
     if not generated_data.shape.is_compatible_with(real_data.shape):
       raise ValueError(
@@ -305,7 +311,8 @@ def acgan_model(
       gen_scope)
   discriminator_variables = contrib.get_trainable_variables(
       dis_scope)
-
+  # pdb.set_trace() # two
+  one_hot_labels = tf.concat([tf.one_hot(real_data['labels'], flags.FLAGS.num_classes), tf.one_hot(generated_data['labels'], flags.FLAGS.num_classes)], axis=1)
   return namedtuples.ACGANModel(
       generator_inputs, generated_data, generator_variables, gen_scope,
       generator_fn, real_data, discriminator_real_outputs,
@@ -588,8 +595,8 @@ def gan_loss(
     gradient_penalty_target=1.0,
     gradient_penalty_one_sided=False,
     mutual_information_penalty_weight=None,
-    aux_cond_generator_weight=None,
-    aux_cond_discriminator_weight=None,
+    aux_cond_generator_weight=flags.FLAGS.aux_cond_generator_weight,
+    aux_cond_discriminator_weight=flags.FLAGS.aux_cond_discriminator_weight,
     tensor_pool_fn=None,
     # Options.
     reduction=tf.compat.v1.losses.Reduction.SUM_BY_NONZERO_WEIGHTS,
