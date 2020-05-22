@@ -392,6 +392,155 @@ def acgan_generator_loss(
 
   return loss
 
+# MHingeGAN loss
+# (...)
+def achingegan_generator_loss(
+    discriminator_gen_classification_logits,
+    one_hot_labels,
+    weights=1.0,
+    scope=None,
+    loss_collection=tf.compat.v1.GraphKeys.LOSSES,
+    reduction=tf.compat.v1.losses.Reduction.SUM_BY_NONZERO_WEIGHTS,
+    add_summaries=False):
+  """Multi-hinge loss for a generator trained with an auxiliary classifier
+
+  Crammer-Singer type loss.
+
+  For more details:
+    ACGAN: https://arxiv.org/abs/1610.09585
+    MHingeGAN: ...
+
+  Args:
+    discriminator_gen_classification_logits: Classification logits for generated
+      data.
+    one_hot_labels: A Tensor holding one-hot labels for the batch.
+    weights: Optional `Tensor` whose rank is either 0, or the same rank as
+      `discriminator_gen_classification_logits`, and must be broadcastable to
+      `discriminator_gen_classification_logits` (i.e., all dimensions must be
+      either `1`, or the same as the corresponding dimension).
+    scope: The scope for the operations performed in computing the loss.
+    loss_collection: collection to which this loss will be added.
+    reduction: A `tf.losses.Reduction` to apply to loss.
+    add_summaries: Whether or not to add summaries for the loss.
+
+  Returns:
+    A loss Tensor. Shape depends on `reduction`.
+
+  Raises:
+    ValueError: if arg module not either `generator` or `discriminator`
+    TypeError: if the discriminator does not output a tuple.
+  """
+  one_hot_labels = one_hot_labels[:,flags.FLAGS.num_classes:]
+  with tf.compat.v1.name_scope(
+      scope, 'achingegan_generator_loss',
+      (discriminator_gen_classification_logits, one_hot_labels)) as scope:
+    target = tf.boolean_mask(discriminator_gen_classification_logits, tf.cast(one_hot_labels, dtype=tf.bool))
+    wrongs = tf.boolean_mask(discriminator_gen_classification_logits, tf.cast(1-one_hot_labels, dtype=tf.bool))
+    wrongs = tf.reshape(wrongs, (-1, flags.FLAGS.num_classes-1))
+    max_wrong = tf.reduce_max(wrongs, axis=1)
+    
+    hinged = tf.nn.relu(1 + max_wrong - target)
+
+    # Average.
+    loss = tf.compat.v1.losses.compute_weighted_loss(
+        hinged,
+        weights,
+        scope,
+        loss_collection=loss_collection,
+        reduction=reduction)
+
+    if add_summaries:
+      tf.compat.v1.summary.scalar('generator_achinge_loss', loss)
+
+  return loss
+  
+def achingegan_discriminator_loss(
+    discriminator_real_classification_logits,
+    discriminator_gen_classification_logits,
+    one_hot_labels,
+    label_smoothing=0.0,
+    real_weights=1.0,
+    generated_weights=1.0,
+    scope=None,
+    loss_collection=tf.compat.v1.GraphKeys.LOSSES,
+    reduction=tf.compat.v1.losses.Reduction.SUM_BY_NONZERO_WEIGHTS,
+    add_summaries=False):
+  """Multi-hinge loss for a discriminator trained with an auxiliary classifier.
+
+  For more details:
+    ACGAN: https://arxiv.org/abs/1610.09585
+    MHingeGAN: ...
+
+  Args:
+    discriminator_real_classification_logits: Classification logits for real
+      data.
+    discriminator_gen_classification_logits: Classification logits for generated
+      data.
+    one_hot_labels: A Tensor holding one-hot labels for the batch.
+    label_smoothing: A float in [0, 1]. If greater than 0, smooth the labels for
+      "discriminator on real data" as suggested in
+      https://arxiv.org/pdf/1701.00160
+    real_weights: Optional `Tensor` whose rank is either 0, or the same rank as
+      `discriminator_real_outputs`, and must be broadcastable to
+      `discriminator_real_outputs` (i.e., all dimensions must be either `1`, or
+      the same as the corresponding dimension).
+    generated_weights: Same as `real_weights`, but for
+      `discriminator_gen_classification_logits`.
+    scope: The scope for the operations performed in computing the loss.
+    loss_collection: collection to which this loss will be added.
+    reduction: A `tf.losses.Reduction` to apply to loss.
+    add_summaries: Whether or not to add summaries for the loss.
+
+  Returns:
+    A loss Tensor. Shape depends on `reduction`.
+
+  Raises:
+    TypeError: If the discriminator does not output a tuple.
+  """
+  one_hot_labels_real = one_hot_labels[:,:flags.FLAGS.num_classes]
+  one_hot_labels_gen = one_hot_labels[:,flags.FLAGS.num_classes:]
+  with tf.compat.v1.name_scope(
+      scope, 'achingegan_discriminator_loss',
+      (discriminator_real_classification_logits,
+       discriminator_gen_classification_logits, one_hot_labels)) as scope:
+         
+    # real
+    target_real = tf.boolean_mask(discriminator_real_classification_logits, tf.cast(one_hot_labels_real, dtype=tf.bool))
+    wrongs_real = tf.boolean_mask(discriminator_real_classification_logits, tf.cast(1-one_hot_labels_real, dtype=tf.bool))
+    wrongs_real = tf.reshape(wrongs_real, (-1, flags.FLAGS.num_classes-1))
+    max_wrong_real = tf.reduce_max(wrongs_real, axis=1)
+    hinged_real = tf.nn.relu(1 + max_wrong_real - target_real)
+    
+    # generated
+    target_gen = tf.boolean_mask(discriminator_gen_classification_logits, tf.cast(one_hot_labels_gen, dtype=tf.bool))
+    wrongs_gen = tf.boolean_mask(discriminator_gen_classification_logits, tf.cast(1-one_hot_labels_gen, dtype=tf.bool))
+    wrongs_gen = tf.reshape(wrongs_gen, (-1, flags.FLAGS.num_classes-1))
+    max_wrong_gen = tf.reduce_max(wrongs_gen, axis=1)
+    hinged_gen = tf.nn.relu(1 + max_wrong_gen - target_gen)
+    
+    loss_on_real = tf.compat.v1.losses.compute_weighted_loss(
+        hinged_real,
+        real_weights,
+        scope,
+        loss_collection=None,
+        reduction=reduction)
+    loss_on_generated = tf.compat.v1.losses.compute_weighted_loss(
+        hinged_gen,
+        generated_weights,
+        scope,
+        loss_collection=None,
+        reduction=reduction)
+    
+    loss = loss_on_generated + loss_on_real
+    tf.compat.v1.losses.add_loss(loss, loss_collection)
+
+    if add_summaries:
+      tf.compat.v1.summary.scalar('discriminator_gen_achinge_loss',
+                                  loss_on_generated)
+      tf.compat.v1.summary.scalar('discriminator_real_achinge_loss', loss_on_real)
+      tf.compat.v1.summary.scalar('discriminator_achinge_loss', loss)
+
+  return loss
 
 # Wasserstein Gradient Penalty losses from `Improved Training of Wasserstein
 # GANs` (https://arxiv.org/abs/1704.00028).

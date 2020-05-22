@@ -106,10 +106,14 @@ flags.DEFINE_string('data_dir', None,
                     'A directory for a TFDS datset. If `None`, use default.')
 flags.DEFINE_string('dataset_name', 'imagenet2012',
                     'Which dataset to use. imagenet2012 is default.')
-flags.DEFINE_float('aux_cond_generator_weight', 1.0,
-                   'default is None.')
-flags.DEFINE_float('aux_cond_discriminator_weight', 1.0, 
-                   'default is None.')
+flags.DEFINE_float('aux_cond_generator_weight', None,
+                   'How to scale generator ACGAN loss relative to WGAN loss, default is None. Try 0.1')
+flags.DEFINE_float('aux_cond_discriminator_weight', None, 
+                   'How to scale the critic ACGAN loss relative to WGAN loss, default is None. Try 1.0')
+flags.DEFINE_float('aux_mhinge_cond_generator_weight', 0.1,
+                   '..., default is None.')
+flags.DEFINE_float('aux_mhinge_cond_discriminator_weight', 1.0, 
+                   '..., default is None.')
 
 FLAGS = flags.FLAGS
 
