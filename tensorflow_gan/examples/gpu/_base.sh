@@ -16,4 +16,4 @@ python self_attention_estimator/train_experiment_main.py \
   --image_size=32 \
   --dataset_val_split_name=test \
   --num_classes=10 \
-  --alsologtostderr
+  --alsologtostderr ${ADDITIONAL}

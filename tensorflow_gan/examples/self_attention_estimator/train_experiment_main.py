@@ -110,9 +110,9 @@ flags.DEFINE_float('aux_cond_generator_weight', None,
                    'How to scale generator ACGAN loss relative to WGAN loss, default is None. Try 0.1')
 flags.DEFINE_float('aux_cond_discriminator_weight', None, 
                    'How to scale the critic ACGAN loss relative to WGAN loss, default is None. Try 1.0')
-flags.DEFINE_float('aux_mhinge_cond_generator_weight', 0.1,
+flags.DEFINE_float('aux_mhinge_cond_generator_weight', None,
                    '..., default is None.')
-flags.DEFINE_float('aux_mhinge_cond_discriminator_weight', 1.0, 
+flags.DEFINE_float('aux_mhinge_cond_discriminator_weight', None, 
                    '..., default is None.')
 
 FLAGS = flags.FLAGS
