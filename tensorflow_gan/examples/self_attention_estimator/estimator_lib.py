@@ -25,6 +25,8 @@ import tensorflow as tf
 
 from tensorflow_gan.examples.self_attention_estimator import eval_lib
 import tensorflow_gan as tfgan  # tf
+from tensorflow_gan.python.losses import losses_impl as tfgan_losses
+from tensorflow_gan.python.losses import tuple_losses
 
 from absl import flags
 
@@ -101,11 +103,23 @@ def get_gpu_estimator(generator, discriminator, hparams, config):
     metrics.update(_generator_summary_ops(gen_images, real_images))
     return metrics
 
+  if flags.FLAGS.critic_type == 'kplusone_wgan':
+    generator_loss_fn=tuple_losses.kplusone_wasserstein_generator_loss
+    discriminator_loss_fn=tfgan_losses.no_loss
+  elif flags.FLAGS.critic_type == 'kplusone_fm':
+    generator_loss_fn=tuple_losses.kplusone_featurematching_generator_loss
+    discriminator_loss_fn=tfgan_losses.no_loss
+  elif flags.FLAGS.critic_type == 'acgan':
+    generator_loss_fn=tfgan.losses.wasserstein_hinge_generator_loss
+    discriminator_loss_fn=tfgan.losses.wasserstein_hinge_discriminator_loss
+  else:
+    raise ValueError('No loss is supported for critic type: %s.' % flags.FLAGS.critic_type)
+
   return tfgan.estimator.GANEstimator(
       generator_fn=generator,
       discriminator_fn=discriminator,
-      generator_loss_fn=tfgan.losses.wasserstein_hinge_generator_loss,
-      discriminator_loss_fn=tfgan.losses.wasserstein_hinge_discriminator_loss,
+      generator_loss_fn=generator_loss_fn,
+      discriminator_loss_fn=discriminator_loss_fn,
       generator_optimizer=tf.compat.v1.train.AdamOptimizer(
           hparams.generator_lr, hparams.beta1),
       discriminator_optimizer=tf.compat.v1.train.AdamOptimizer(

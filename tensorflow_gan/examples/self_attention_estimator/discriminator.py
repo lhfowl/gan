@@ -19,6 +19,8 @@ import tensorflow as tf
 from tensorflow_gan.examples import compat_utils
 from tensorflow_gan.examples.self_attention_estimator import ops
 
+from absl import flags
+
 import pdb
 
 def dsample(x):
@@ -88,7 +90,78 @@ def optimized_block(x, out_channels, name, act=tf.nn.relu):
     x_0 = ops.snconv2d(x_0, out_channels, 1, 1, 1, 1, name='sn_conv3')
     return x + x_0
 
-def discriminator(image, labels, df_dim, number_classes, act=tf.nn.relu):
+def discriminator_32_kplusone_wgan(image, labels, df_dim, number_classes, act=tf.nn.relu):
+  """Builds the discriminator graph.
+
+  Args:
+    image: The current batch of images to classify as fake or real.
+    labels: The corresponding labels for the images.
+    df_dim: The df dimension.
+    number_classes: The number of classes in the labels.
+    act: The activation function used in the discriminator.
+  Returns:
+    - A `Tensor` representing the logits of the discriminator.
+    - A list containing all trainable varaibles defined by the model.
+  """
+  with tf.compat.v1.variable_scope(
+      'discriminator', reuse=tf.compat.v1.AUTO_REUSE) as dis_scope:
+    h0 = optimized_block(
+        image, df_dim, 'd_optimized_block1', act=act)  # 64 * 64
+    h1 = block(h0, df_dim * 4, 'd_block2', act=act)  # 32 * 32
+    # h1 = ops.sn_non_local_block_sim(h1, name='d_ops')  # 32 * 32
+    h2 = block(h1, df_dim * 4, 'd_block3', act=act)  # 16 * 16
+    # h3 = block(h2, df_dim * 8, 'd_block4', act=act)  # 8 * 8
+    # h4 = block(h3, df_dim * 16, 'd_block5', act=act)  # 4 * 4
+    h5 = block(h2, df_dim * 4, 'd_block6', downsample=False, act=act)
+    h5_act = act(h5)
+    h6 = tf.reduce_sum(input_tensor=h5_act, axis=[1, 2])
+    # output = ops.snlinear(h6, 1, name='d_sn_linear')
+    # h_labels = ops.sn_embedding(labels, number_classes, df_dim * 4, name='d_embedding')
+    classification_output = ops.snlinear(h6, flags.FLAGS.num_classes+1, name='d_sn_linear_kplusone')
+    # output += tf.reduce_sum(input_tensor=h6 * h_labels, axis=1, keepdims=True)
+    output = classification_output[:,flags.FLAGS.num_classes:]
+    
+  var_list = tf.compat.v1.get_collection(
+      tf.compat.v1.GraphKeys.TRAINABLE_VARIABLES, dis_scope.name)
+  return output, classification_output, var_list
+
+def discriminator_32_kplusone_fm(image, labels, df_dim, number_classes, act=tf.nn.relu):
+  """Builds the discriminator graph.
+
+  Args:
+    image: The current batch of images to classify as fake or real.
+    labels: The corresponding labels for the images.
+    df_dim: The df dimension.
+    number_classes: The number of classes in the labels.
+    act: The activation function used in the discriminator.
+  Returns:
+    - A `Tensor` representing the logits of the discriminator.
+    - A list containing all trainable varaibles defined by the model.
+  """
+  with tf.compat.v1.variable_scope(
+      'discriminator', reuse=tf.compat.v1.AUTO_REUSE) as dis_scope:
+    h0 = optimized_block(
+        image, df_dim, 'd_optimized_block1', act=act)  # 64 * 64
+    h1 = block(h0, df_dim * 4, 'd_block2', act=act)  # 32 * 32
+    # h1 = ops.sn_non_local_block_sim(h1, name='d_ops')  # 32 * 32
+    h2 = block(h1, df_dim * 4, 'd_block3', act=act)  # 16 * 16
+    # h3 = block(h2, df_dim * 8, 'd_block4', act=act)  # 8 * 8
+    # h4 = block(h3, df_dim * 16, 'd_block5', act=act)  # 4 * 4
+    h5 = block(h2, df_dim * 4, 'd_block6', downsample=False, act=act)
+    h5_act = act(h5)
+    h6 = tf.reduce_sum(input_tensor=h5_act, axis=[1, 2])
+    # output = ops.snlinear(h6, 1, name='d_sn_linear')
+    # h_labels = ops.sn_embedding(labels, number_classes, df_dim * 4, name='d_embedding')
+    classification_output = ops.snlinear(h6, flags.FLAGS.num_classes+1, name='d_sn_linear_kplusone')
+    # output += tf.reduce_sum(input_tensor=h6 * h_labels, axis=1, keepdims=True)
+    # output = classification_output[:,flags.FLAGS.num_classes:]
+    output = h6
+    
+  var_list = tf.compat.v1.get_collection(
+      tf.compat.v1.GraphKeys.TRAINABLE_VARIABLES, dis_scope.name)
+  return output, classification_output, var_list
+
+def discriminator_32(image, labels, df_dim, number_classes, act=tf.nn.relu):
   """Builds the discriminator graph.
 
   Args:
@@ -116,7 +189,7 @@ def discriminator(image, labels, df_dim, number_classes, act=tf.nn.relu):
     output = ops.snlinear(h6, 1, name='d_sn_linear')
     h_labels = ops.sn_embedding(labels, number_classes, df_dim * 4,
                                 name='d_embedding')
-    classification_output = ops.snlinear(h6, 10, name='d_sn_linear_class')
+    classification_output = ops.snlinear(h6, flags.FLAGS.num_classes, name='d_sn_linear_class')
     output += tf.reduce_sum(input_tensor=h6 * h_labels, axis=1, keepdims=True)
     
   var_list = tf.compat.v1.get_collection(
@@ -151,7 +224,7 @@ def discriminator_64(image, labels, df_dim, number_classes, act=tf.nn.relu):
     output = ops.snlinear(h6, 1, name='d_sn_linear')
     h_labels = ops.sn_embedding(labels, number_classes, df_dim * 8,
                                 name='d_embedding')
-    classification_output = ops.snlinear(h6, 10, name='d_sn_linear_class')
+    classification_output = ops.snlinear(h6, flags.FLAGS.num_classes, name='d_sn_linear_class')
     output += tf.reduce_sum(input_tensor=h6 * h_labels, axis=1, keepdims=True)
     
   var_list = tf.compat.v1.get_collection(
@@ -190,3 +263,12 @@ def discriminator_128(image, labels, df_dim, number_classes, act=tf.nn.relu):
   var_list = tf.compat.v1.get_collection(
       tf.compat.v1.GraphKeys.TRAINABLE_VARIABLES, dis_scope.name)
   return output, var_list
+
+discriminators = {
+  (32, 'kplusone_fm'): discriminator_32_kplusone_fm,
+  (32, 'kplusone_wgan'): discriminator_32_kplusone_wgan,
+  (32, 'acgan'): discriminator_32,
+  (64, 'acgan'): discriminator_64,
+}
+
+discriminator = discriminators[flags.FLAGS.image_size, flags.FLAGS.critic_type]

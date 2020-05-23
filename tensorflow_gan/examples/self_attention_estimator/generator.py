@@ -19,6 +19,8 @@ import tensorflow as tf
 import tensorflow_gan as tfgan
 from tensorflow_gan.examples.self_attention_estimator import ops
 
+from absl import flags
+
 
 def make_z_normal(num_batches, batch_size, z_dim):
   """Make random noise tensors with normal distribution.
@@ -97,7 +99,7 @@ def block(x, labels, out_channels, num_classes, name, training=True):
     return x_0 + x
 
 
-def generator(zs, target_class, gf_dim, num_classes, training=True):
+def generator_32(zs, target_class, gf_dim, num_classes, training=True):
   """Builds the generator segment of the graph, going from z -> G(z).
 
   Args:
@@ -204,3 +206,10 @@ def generator_128(zs, target_class, gf_dim, num_classes, training=True):
   var_list = tf.compat.v1.get_collection(
       tf.compat.v1.GraphKeys.TRAINABLE_VARIABLES, gen_scope.name)
   return out, var_list
+
+generators = {
+  32: generator_32,
+  64: generator_64,
+}
+
+generator = generators[flags.FLAGS.image_size]

@@ -311,8 +311,9 @@ def acgan_model(
       gen_scope)
   discriminator_variables = contrib.get_trainable_variables(
       dis_scope)
-  # pdb.set_trace() # two
-  one_hot_labels = tf.concat([tf.one_hot(real_data['labels'], flags.FLAGS.num_classes), tf.one_hot(generated_data['labels'], flags.FLAGS.num_classes)], axis=1)
+  
+  k = flags.FLAGS.num_classes+1 if ('kplusone' in flags.FLAGS.critic_type) else flags.FLAGS.num_classes
+  one_hot_labels = tf.concat([tf.one_hot(real_data['labels'], k), tf.one_hot(generated_data['labels'], k)], axis=1)
   return namedtuples.ACGANModel(
       generator_inputs, generated_data, generator_variables, gen_scope,
       generator_fn, real_data, discriminator_real_outputs,
@@ -599,6 +600,7 @@ def gan_loss(
     aux_cond_discriminator_weight=flags.FLAGS.aux_cond_discriminator_weight,
     aux_mhinge_cond_generator_weight=flags.FLAGS.aux_mhinge_cond_generator_weight,
     aux_mhinge_cond_discriminator_weight=flags.FLAGS.aux_mhinge_cond_discriminator_weight,
+    kplusone_mhinge_cond_discriminator_weight=flags.FLAGS.kplusone_mhinge_cond_discriminator_weight,
     tensor_pool_fn=None,
     # Options.
     reduction=tf.compat.v1.losses.Reduction.SUM_BY_NONZERO_WEIGHTS,
@@ -665,6 +667,8 @@ def gan_loss(
       aux_mhinge_cond_generator_weight, 'aux_mhinge_cond_generator_weight')
   aux_mhinge_cond_discriminator_weight = _validate_aux_loss_weight(
       aux_mhinge_cond_discriminator_weight, 'aux_mhinge_cond_discriminator_weight')
+  kplusone_mhinge_cond_discriminator_weight = _validate_aux_loss_weight(
+      kplusone_mhinge_cond_discriminator_weight, 'kplusone_mhinge_cond_discriminator_weight')
 
   # Verify configuration for mutual information penalty
   if (_use_aux_loss(mutual_information_penalty_weight) and
@@ -677,12 +681,15 @@ def gan_loss(
   if ((_use_aux_loss(aux_cond_generator_weight) or
        _use_aux_loss(aux_cond_discriminator_weight) or
        _use_aux_loss(aux_mhinge_cond_generator_weight) or
-       _use_aux_loss(aux_mhinge_cond_discriminator_weight)) and
+       _use_aux_loss(aux_mhinge_cond_discriminator_weight) or
+       _use_aux_loss(kplusone_mhinge_cond_discriminator_weight)) and
       not isinstance(model, namedtuples.ACGANModel)):
     raise ValueError(
-        'When `aux_(mhinge)_cond_(generator|discriminator)_weight` '
+        'When `(aux|kplusone)_(mhinge_)cond_(generator|discriminator)_weight` '
         'is provided, `model` must be an `ACGANModel`. Instead, was %s.' %
         type(model))
+  
+  # Verify configuration for kplusone situation
 
   # Optionally create pooled model.
   if tensor_pool_fn:
@@ -744,6 +751,12 @@ def gan_loss(
     ac_disc_loss = tuple_losses.achingegan_discriminator_loss(
         pooled_model, reduction=reduction, add_summaries=add_summaries)
     dis_loss += aux_mhinge_cond_discriminator_weight * ac_disc_loss
+  # The following is not conceptually an auxiliary loss, but it takes args
+  # in a similar way
+  if _use_aux_loss(kplusone_mhinge_cond_discriminator_weight):
+    kplusone_disc_loss = tuple_losses.multihingegan_discriminator_loss(
+        pooled_model, reduction=reduction, add_summaries=add_summaries)
+    dis_loss += kplusone_mhinge_cond_discriminator_weight * kplusone_disc_loss
   # Gathers auxiliary losses.
   if model.generator_scope:
     gen_reg_loss = tf.compat.v1.losses.get_regularization_loss(

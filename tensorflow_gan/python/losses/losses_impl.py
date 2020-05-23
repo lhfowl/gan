@@ -62,6 +62,8 @@ __all__ = [
     'mutual_information_penalty',
     'combine_adversarial_loss',
     'cycle_consistency_loss',
+    'kplusone_wasserstein_generator_loss',
+    'kplusone_featurematching_generator_loss'
 ]
 
 
@@ -392,8 +394,8 @@ def acgan_generator_loss(
 
   return loss
 
-# MHingeGAN loss
-# (...)
+# MHingeGAN losses
+# (https://arxiv.org/abs/1912.04216)
 def achingegan_generator_loss(
     discriminator_gen_classification_logits,
     one_hot_labels,
@@ -402,13 +404,15 @@ def achingegan_generator_loss(
     loss_collection=tf.compat.v1.GraphKeys.LOSSES,
     reduction=tf.compat.v1.losses.Reduction.SUM_BY_NONZERO_WEIGHTS,
     add_summaries=False):
-  """Multi-hinge loss for a generator trained with an auxiliary classifier
+  """
+  Multi-hinge loss for a generator trained with either an auxiliary
+  classifier or a kplusone classifier.
 
   Crammer-Singer type loss.
 
   For more details:
     ACGAN: https://arxiv.org/abs/1610.09585
-    MHingeGAN: ...
+    MHingeGAN: https://arxiv.org/abs/1912.04216
 
   Args:
     discriminator_gen_classification_logits: Classification logits for generated
@@ -430,13 +434,14 @@ def achingegan_generator_loss(
     ValueError: if arg module not either `generator` or `discriminator`
     TypeError: if the discriminator does not output a tuple.
   """
-  one_hot_labels = one_hot_labels[:,flags.FLAGS.num_classes:]
+  k = flags.FLAGS.num_classes+1 if ('kplusone' in flags.FLAGS.critic_type) else flags.FLAGS.num_classes
+  one_hot_labels = one_hot_labels[:,k:]
   with tf.compat.v1.name_scope(
-      scope, 'achingegan_generator_loss',
+      scope, 'multihingegan_generator_loss',
       (discriminator_gen_classification_logits, one_hot_labels)) as scope:
     target = tf.boolean_mask(discriminator_gen_classification_logits, tf.cast(one_hot_labels, dtype=tf.bool))
     wrongs = tf.boolean_mask(discriminator_gen_classification_logits, tf.cast(1-one_hot_labels, dtype=tf.bool))
-    wrongs = tf.reshape(wrongs, (-1, flags.FLAGS.num_classes-1))
+    wrongs = tf.reshape(wrongs, (-1, k-1))
     max_wrong = tf.reduce_max(wrongs, axis=1)
     
     hinged = tf.nn.relu(1 + max_wrong - target)
@@ -450,7 +455,7 @@ def achingegan_generator_loss(
         reduction=reduction)
 
     if add_summaries:
-      tf.compat.v1.summary.scalar('generator_achinge_loss', loss)
+      tf.compat.v1.summary.scalar('generator_multihinge_loss', loss)
 
   return loss
   
@@ -541,6 +546,181 @@ def achingegan_discriminator_loss(
       tf.compat.v1.summary.scalar('discriminator_achinge_loss', loss)
 
   return loss
+  
+def multihingegan_discriminator_loss(
+    discriminator_real_classification_logits,
+    discriminator_gen_classification_logits,
+    one_hot_labels,
+    label_smoothing=0.0,
+    real_weights=1.0,
+    generated_weights=1.0,
+    scope=None,
+    loss_collection=tf.compat.v1.GraphKeys.LOSSES,
+    reduction=tf.compat.v1.losses.Reduction.SUM_BY_NONZERO_WEIGHTS,
+    add_summaries=False):
+  """Multi-hinge loss for a discriminator trained with a kplusone classifier.
+
+  For more details:
+    MHingeGAN: https://arxiv.org/abs/1912.04216
+
+  Args:
+    discriminator_real_classification_logits: Classification logits for real
+      data.
+    discriminator_gen_classification_logits: Classification logits for generated
+      data.
+    one_hot_labels: A Tensor holding one-hot labels for the batch.
+    label_smoothing: A float in [0, 1]. If greater than 0, smooth the labels for
+      "discriminator on real data" as suggested in
+      https://arxiv.org/pdf/1701.00160
+    real_weights: Optional `Tensor` whose rank is either 0, or the same rank as
+      `discriminator_real_outputs`, and must be broadcastable to
+      `discriminator_real_outputs` (i.e., all dimensions must be either `1`, or
+      the same as the corresponding dimension).
+    generated_weights: Same as `real_weights`, but for
+      `discriminator_gen_classification_logits`.
+    scope: The scope for the operations performed in computing the loss.
+    loss_collection: collection to which this loss will be added.
+    reduction: A `tf.losses.Reduction` to apply to loss.
+    add_summaries: Whether or not to add summaries for the loss.
+
+  Returns:
+    A loss Tensor. Shape depends on `reduction`.
+
+  Raises:
+    TypeError: If the discriminator does not output a tuple.
+  """
+  k = flags.FLAGS.num_classes+1 if ('kplusone' in flags.FLAGS.critic_type) else flags.FLAGS.num_classes
+  one_hot_labels_real = one_hot_labels[:,:k]
+  with tf.compat.v1.name_scope(
+      scope, 'multihingegan_discriminator_loss',
+      (discriminator_real_classification_logits,
+       discriminator_gen_classification_logits, one_hot_labels)) as scope:
+
+    # real, should get the correct class
+    target_real = tf.boolean_mask(discriminator_real_classification_logits, tf.cast(one_hot_labels_real, dtype=tf.bool))
+    wrongs_real = tf.boolean_mask(discriminator_real_classification_logits, tf.cast(1-one_hot_labels_real, dtype=tf.bool))
+    wrongs_real = tf.reshape(wrongs_real, (-1, k-1))
+    max_wrong_real = tf.reduce_max(wrongs_real, axis=1)
+    hinged_real = tf.nn.relu(1 + max_wrong_real - target_real)
+    
+    # generated, should get the fake class
+    one_hot_fake_class = tf.concat([tf.zeros_like(one_hot_labels_real[:,:(k-1)]), tf.ones_like(one_hot_labels_real[:,(k-1):k])], axis=1)
+    target_gen = tf.boolean_mask(discriminator_gen_classification_logits, tf.cast(one_hot_fake_class, dtype=tf.bool))
+    wrongs_gen = tf.boolean_mask(discriminator_gen_classification_logits, tf.cast(1-one_hot_fake_class, dtype=tf.bool))
+    wrongs_gen = tf.reshape(wrongs_gen, (-1, k-1))
+    max_wrong_gen = tf.reduce_max(wrongs_gen, axis=1)
+    hinged_gen = tf.nn.relu(1 + max_wrong_gen - target_gen)
+    
+    loss_on_real = tf.compat.v1.losses.compute_weighted_loss(
+        hinged_real,
+        real_weights,
+        scope,
+        loss_collection=None,
+        reduction=reduction)
+    loss_on_generated = tf.compat.v1.losses.compute_weighted_loss(
+        hinged_gen,
+        generated_weights,
+        scope,
+        loss_collection=None,
+        reduction=reduction)
+    
+    loss = loss_on_generated + loss_on_real
+    tf.compat.v1.losses.add_loss(loss, loss_collection)
+
+    if add_summaries:
+      tf.compat.v1.summary.scalar('discriminator_gen_multihinge_loss',
+                                  loss_on_generated)
+      tf.compat.v1.summary.scalar('discriminator_real_multihinge_loss', loss_on_real)
+      tf.compat.v1.summary.scalar('discriminator_multihinge_loss', loss)
+
+  return loss
+
+def kplusone_featurematching_generator_loss(
+    discriminator_real_outputs,
+    discriminator_gen_outputs,
+    weights=1.0,
+    scope=None,
+    loss_collection=tf.compat.v1.GraphKeys.LOSSES,
+    reduction=tf.compat.v1.losses.Reduction.SUM_BY_NONZERO_WEIGHTS,
+    add_summaries=False):
+  """Feature Matching generator loss for use with MHinge kplusone GANs.
+  
+  Kind of hacky but discriminator_real_outputs and discriminator_gen_outputs
+  should be the penultimate features of the network.
+
+  See `MHingeGAN` (https://arxiv.org/abs/1912.04216) for more details.
+
+  Args:
+    discriminator_gen_outputs: Discriminator output on generated data. Expected
+      to be in the range of (-inf, inf).
+    weights: Optional `Tensor` whose rank is either 0, or the same rank as
+      `discriminator_gen_outputs`, and must be broadcastable to
+      `discriminator_gen_outputs` (i.e., all dimensions must be either `1`, or
+      the same as the corresponding dimension).
+    scope: The scope for the operations performed in computing the loss.
+    loss_collection: collection to which this loss will be added.
+    reduction: A `tf.losses.Reduction` to apply to loss.
+    add_summaries: Whether or not to add detailed summaries for the loss.
+
+  Returns:
+    A loss Tensor. The shape depends on `reduction`.
+  """
+  with tf.compat.v1.name_scope(
+      scope, 'kplusone_generator_feature_matching_loss',
+      (discriminator_real_outputs, discriminator_gen_outputs,
+       weights)) as scope:
+    
+    loss = tf.compat.v1.losses.absolute_difference(discriminator_gen_outputs,
+        discriminator_real_outputs, weights, scope, loss_collection, reduction)
+
+    if add_summaries:
+      tf.compat.v1.summary.scalar('kplusone_generator_fm_loss', loss)
+
+  return loss
+
+def kplusone_wasserstein_generator_loss(
+    discriminator_gen_outputs,
+    weights=1.0,
+    scope=None,
+    loss_collection=tf.compat.v1.GraphKeys.LOSSES,
+    reduction=tf.compat.v1.losses.Reduction.SUM_BY_NONZERO_WEIGHTS,
+    add_summaries=False):
+  """Wasserstein generator loss for use with MHinge kplusone GANs.
+  
+  The sign is flipped since the input is the affinity for the fake class.
+
+  See `Wasserstein GAN` (https://arxiv.org/abs/1701.07875) for more details.
+
+  Args:
+    discriminator_gen_outputs: Discriminator output on generated data. Expected
+      to be in the range of (-inf, inf).
+    weights: Optional `Tensor` whose rank is either 0, or the same rank as
+      `discriminator_gen_outputs`, and must be broadcastable to
+      `discriminator_gen_outputs` (i.e., all dimensions must be either `1`, or
+      the same as the corresponding dimension).
+    scope: The scope for the operations performed in computing the loss.
+    loss_collection: collection to which this loss will be added.
+    reduction: A `tf.losses.Reduction` to apply to loss.
+    add_summaries: Whether or not to add detailed summaries for the loss.
+
+  Returns:
+    A loss Tensor. The shape depends on `reduction`.
+  """
+  with tf.compat.v1.name_scope(scope, 'generator_wasserstein_loss',
+                               (discriminator_gen_outputs, weights)) as scope:
+    discriminator_gen_outputs = _to_float(discriminator_gen_outputs)
+
+    loss = discriminator_gen_outputs
+    loss = tf.compat.v1.losses.compute_weighted_loss(loss, weights, scope,
+                                                     loss_collection, reduction)
+
+    if add_summaries:
+      tf.compat.v1.summary.scalar('generator_wass_loss', loss)
+
+  return loss
+
+def no_loss(*args, **kwargs):
+  return 0
 
 # Wasserstein Gradient Penalty losses from `Improved Training of Wasserstein
 # GANs` (https://arxiv.org/abs/1704.00028).

@@ -191,12 +191,18 @@ acgan_discriminator_loss = args_to_gan_model(
 acgan_generator_loss = args_to_gan_model(
     tfgan_losses.acgan_generator_loss)
     
-# Multihinge ACGAN losses from ...
-# (...).
+# Multihinge ACGAN losses
+# (https://arxiv.org/abs/1912.04216).
 achingegan_discriminator_loss = args_to_gan_model(
     tfgan_losses.achingegan_discriminator_loss)
 achingegan_generator_loss = args_to_gan_model(
     tfgan_losses.achingegan_generator_loss)
+multihingegan_discriminator_loss = args_to_gan_model(
+    tfgan_losses.multihingegan_discriminator_loss)
+kplusone_wasserstein_generator_loss = args_to_gan_model(
+    tfgan_losses.kplusone_wasserstein_generator_loss)
+kplusone_featurematching_generator_loss = args_to_gan_model(
+    tfgan_losses.kplusone_featurematching_generator_loss)
 
 
 # Original losses from `Generative Adversarial Nets`
