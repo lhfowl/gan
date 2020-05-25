@@ -115,7 +115,7 @@ flags.DEFINE_float('aux_mhinge_cond_generator_weight', None,
 flags.DEFINE_float('aux_mhinge_cond_discriminator_weight', None, 
                    '..., default is None.')
 flags.DEFINE_enum(
-    'critic_type', 'acgan', ['acgan', 'kplusone_fm', 'kplusone_wgan'],
+    'critic_type', 'acgan', ['acgan', 'kplusone_fm', 'kplusone_wgan', 'acgan_noproj'],
     '...')
 flags.DEFINE_float('kplusone_mhinge_cond_discriminator_weight', None, 
                    '..., default is None.')
@@ -123,12 +123,16 @@ flags.DEFINE_float('kplusone_mhinge_cond_discriminator_weight', None,
 flags.DEFINE_string('unlabelled_dataset_name', None,
                     'If set use unlabelled data.')
 flags.DEFINE_string('unlabelled_dataset_split_name', 'unlabelled',
-                    'Which dataset to use. imagenet2012 is default.')
+                    '...')
 flags.DEFINE_float('kplusone_mhinge_ssl_cond_discriminator_weight', None, 
                    '..., default is None.')
 flags.DEFINE_enum(
     'generator_loss_fn', None, ['kplusone_wasserstein_generator_loss', 'kplusone_featurematching_generator_loss', 'kplusone_ssl_featurematching_generator_loss'],
     '...')
+flags.DEFINE_integer(
+    'tpu_gan_estimator_d_step', 1,
+    '...')
+flags.DEFINE_float('generator_margin_size', 1.0, 'Used in achingegan_generator_loss.')
 
 
 FLAGS = flags.FLAGS

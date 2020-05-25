@@ -62,11 +62,27 @@ def get_run_config_from_hparams(hparams):
 
 
 def get_tpu_estimator(generator, discriminator, hparams, config):
+  gen_losses = {
+    'kplusone_wasserstein_generator_loss' :tuple_losses.kplusone_wasserstein_generator_loss,
+    'kplusone_featurematching_generator_loss' :tuple_losses.kplusone_featurematching_generator_loss,
+    'kplusone_ssl_featurematching_generator_loss' :tuple_losses.kplusone_ssl_featurematching_generator_loss
+  }
+  if flags.FLAGS.generator_loss_fn is not None:
+    generator_loss_fn = gen_losses[flags.FLAGS.generator_loss_fn]
+    discriminator_loss_fn=tfgan_losses.no_loss
+  else: #acgan mode
+    assert 'acgan' in flags.FLAGS.critic_type, '--generator_loss_fn cannot be None for non-acgan critic'
+    generator_loss_fn=tuple_losses.wasserstein_hinge_generator_loss
+    if flags.FLAGS.unlabelled_dataset_name is None:
+      discriminator_loss_fn=tfgan.losses.wasserstein_hinge_discriminator_loss
+    else:
+      discriminator_loss_fn=tuple_losses.ssl_wasserstein_hinge_discriminator_loss
+    
   return tfgan.estimator.TPUGANEstimator(
       generator_fn=generator,
       discriminator_fn=discriminator,
-      generator_loss_fn=tfgan.losses.wasserstein_hinge_generator_loss,
-      discriminator_loss_fn=tfgan.losses.wasserstein_hinge_discriminator_loss,
+      generator_loss_fn=generator_loss_fn,
+      discriminator_loss_fn=discriminator_loss_fn,
       generator_optimizer=tf.compat.v1.train.AdamOptimizer(
           hparams.generator_lr, hparams.beta1),
       discriminator_optimizer=tf.compat.v1.train.AdamOptimizer(
@@ -112,7 +128,7 @@ def get_gpu_estimator(generator, discriminator, hparams, config):
     generator_loss_fn = gen_losses[flags.FLAGS.generator_loss_fn]
     discriminator_loss_fn=tfgan_losses.no_loss
   else: #acgan mode
-    assert flags.FLAGS.critic_type == 'acgan', '--generator_loss_fn cannot be None for non-acgan critic'
+    assert 'acgan' in flags.FLAGS.critic_type, '--generator_loss_fn cannot be None for non-acgan critic'
     generator_loss_fn=tuple_losses.wasserstein_hinge_generator_loss
     discriminator_loss_fn=tfgan.losses.wasserstein_hinge_discriminator_loss
 

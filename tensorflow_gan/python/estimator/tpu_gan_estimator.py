@@ -30,6 +30,9 @@ from tensorflow_gan.python import namedtuples as tfgan_tuples
 from tensorflow_gan.python import train as tfgan_train
 from tensorflow_gan.python.estimator import gan_estimator
 
+from absl import flags
+
+import pdb
 
 __all__ = [
     'TPUGANEstimator',
@@ -98,7 +101,7 @@ class TPUGANEstimator(tf.compat.v1.estimator.tpu.TPUEstimator):
       get_eval_metric_ops_fn=None,
       add_summaries=None,
       joint_train=False,
-      gan_train_steps=tfgan_tuples.GANTrainSteps(1, 1),
+      gan_train_steps=tfgan_tuples.GANTrainSteps(1, flags.FLAGS.tpu_gan_estimator_d_step),
       # TPUEstimator options.
       model_dir=None,
       config=None,
@@ -386,13 +389,19 @@ def _make_gan_model_fns(generator_fn, discriminator_fn, real_data,
   generator_input_slices = _slice_data(generator_inputs, num_models)
 
   gan_model_fns = []
+  k = flags.FLAGS.num_classes+1 if ('kplusone' in flags.FLAGS.critic_type) else flags.FLAGS.num_classes
+  if flags.FLAGS.unlabelled_dataset_name is not None:
+    which_acgan = tfgan_train.ssl_acgan_model
+  else:
+    which_acgan = tfgan_train.acgan_model
   for i in range(num_models):
     gan_model_fn = functools.partial(
-        tfgan_train.gan_model,
+        which_acgan,
         generator_fn,
         discriminator_fn,
         real_data_slices[i],
         generator_input_slices[i],
+        one_hot_labels=tf.one_hot(real_data_slices[i]['labels'], 2*k),
         generator_scope=generator_scope,
         discriminator_scope=discriminator_scope,
         check_shapes=False)

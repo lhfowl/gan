@@ -253,6 +253,91 @@ def wasserstein_hinge_discriminator_loss(
       tf.compat.v1.summary.scalar('discriminator_wass_hinge_loss', loss)
 
   return loss
+  
+def ssl_wasserstein_hinge_discriminator_loss(
+    discriminator_real_outputs,
+    discriminator_gen_outputs,
+    discriminator_unlabelled_outputs,
+    real_weights=1.0,
+    generated_weights=1.0,
+    real_hinge=1.0,
+    generated_hinge=1.0,
+    scope=None,
+    loss_collection=tf.compat.v1.GraphKeys.LOSSES,
+    reduction=tf.compat.v1.losses.Reduction.SUM_BY_NONZERO_WEIGHTS,
+    add_summaries=False):
+  """Hinged wasserstein discriminator loss for GANs.
+
+  See `Spectral Normalization for Generative Adversarial Networks`
+  (https://arxiv.org/abs/1802.05957).
+
+  Args:
+    discriminator_real_outputs: Discriminator output on real data.
+    discriminator_gen_outputs: Discriminator output on generated data. Expected
+      to be in the range of (-inf, inf).
+    real_weights: Optional `Tensor` whose rank is either 0, or the same rank as
+      `discriminator_real_outputs`, and must be broadcastable to
+      `discriminator_real_outputs` (i.e., all dimensions must be either `1`, or
+      the same as the corresponding dimension).
+    generated_weights: Same as `real_weights`, but for
+      `discriminator_gen_outputs`.
+    real_hinge: Hinge for the logits from the real data.
+    generated_hinge: Hinge for the logits from the generated data.
+    scope: The scope for the operations performed in computing the loss.
+    loss_collection: collection to which this loss will be added.
+    reduction: A `tf.losses.Reduction` to apply to loss.
+    add_summaries: Whether or not to add summaries for the loss.
+
+  Returns:
+    A loss Tensor. The shape depends on `reduction`.
+  """
+  with tf.compat.v1.name_scope(
+      scope, 'discriminator_wasserstein_hinge_loss',
+      (discriminator_real_outputs, discriminator_gen_outputs, discriminator_unlabelled_outputs, real_weights,
+       generated_weights)) as scope:
+    discriminator_real_outputs = _to_float(discriminator_real_outputs)
+    discriminator_gen_outputs = _to_float(discriminator_gen_outputs)
+    discriminator_unlabelled_outputs = _to_float(discriminator_unlabelled_outputs)
+    discriminator_real_outputs.shape.assert_is_compatible_with(
+        discriminator_gen_outputs.shape)
+
+    # Compute the hinge.
+    hinged_real = tf.nn.relu(real_hinge - discriminator_real_outputs)
+    hinged_unl = tf.nn.relu(real_hinge - discriminator_unlabelled_outputs)
+    hinged_gen = tf.nn.relu(generated_hinge + discriminator_gen_outputs)
+
+    # Average.
+    loss_on_real = tf.compat.v1.losses.compute_weighted_loss(
+        hinged_real,
+        real_weights,
+        scope,
+        loss_collection=None,
+        reduction=reduction)
+    loss_on_unl = tf.compat.v1.losses.compute_weighted_loss(
+        hinged_unl,
+        real_weights,
+        scope,
+        loss_collection=None,
+        reduction=reduction)
+    loss_on_generated = tf.compat.v1.losses.compute_weighted_loss(
+        hinged_gen,
+        generated_weights,
+        scope,
+        loss_collection=None,
+        reduction=reduction)
+    loss = loss_on_generated + loss_on_real/2.0 + loss_on_unl/2.0
+    tf.compat.v1.losses.add_loss(loss, loss_collection)
+
+    if add_summaries:
+      tf.compat.v1.summary.scalar('discriminator_gen_wass_hinge_loss',
+                                  loss_on_generated)
+      tf.compat.v1.summary.scalar('discriminator_real_wass_hinge_loss',
+                                  loss_on_real)
+      tf.compat.v1.summary.scalar('discriminator_unl_wass_hinge_loss',
+                                  loss_on_unl)
+      tf.compat.v1.summary.scalar('discriminator_wass_hinge_loss', loss)
+
+  return loss
 
 
 # ACGAN losses from `Conditional Image Synthesis With Auxiliary Classifier GANs`
@@ -434,17 +519,22 @@ def achingegan_generator_loss(
     ValueError: if arg module not either `generator` or `discriminator`
     TypeError: if the discriminator does not output a tuple.
   """
+  margin = flags.FLAGS.generator_margin_size
   k = flags.FLAGS.num_classes+1 if ('kplusone' in flags.FLAGS.critic_type) else flags.FLAGS.num_classes
   one_hot_labels = one_hot_labels[:,k:]
   with tf.compat.v1.name_scope(
       scope, 'multihingegan_generator_loss',
       (discriminator_gen_classification_logits, one_hot_labels)) as scope:
-    target = tf.boolean_mask(discriminator_gen_classification_logits, tf.cast(one_hot_labels, dtype=tf.bool))
-    wrongs = tf.boolean_mask(discriminator_gen_classification_logits, tf.cast(1-one_hot_labels, dtype=tf.bool))
-    wrongs = tf.reshape(wrongs, (-1, k-1))
-    max_wrong = tf.reduce_max(wrongs, axis=1)
     
-    hinged = tf.nn.relu(1 + max_wrong - target)
+    target = tf.reduce_sum(discriminator_gen_classification_logits * one_hot_labels, axis=1, keepdims=True)
+    hinged = tf.reduce_max((margin + discriminator_gen_classification_logits - target) * (1-one_hot_labels), axis=1)
+        
+    # target = tf.boolean_mask(discriminator_gen_classification_logits, tf.cast(one_hot_labels, dtype=tf.bool))
+    # wrongs = tf.boolean_mask(discriminator_gen_classification_logits, tf.cast(1-one_hot_labels, dtype=tf.bool))
+    # wrongs = tf.reshape(wrongs, (-1, k-1))
+    # max_wrong = tf.reduce_max(wrongs, axis=1)
+    
+    # hinged = tf.nn.relu(1 + max_wrong - target)
 
     # Average.
     loss = tf.compat.v1.losses.compute_weighted_loss(
@@ -502,26 +592,21 @@ def achingegan_discriminator_loss(
   Raises:
     TypeError: If the discriminator does not output a tuple.
   """
-  one_hot_labels_real = one_hot_labels[:,:flags.FLAGS.num_classes]
-  one_hot_labels_gen = one_hot_labels[:,flags.FLAGS.num_classes:]
+  k = flags.FLAGS.num_classes+1 if ('kplusone' in flags.FLAGS.critic_type) else flags.FLAGS.num_classes
   with tf.compat.v1.name_scope(
       scope, 'achingegan_discriminator_loss',
       (discriminator_real_classification_logits,
        discriminator_gen_classification_logits, one_hot_labels)) as scope:
+    one_hot_labels_real = one_hot_labels[:,:k]
+    one_hot_labels_gen = one_hot_labels[:,k:]
          
     # real
-    target_real = tf.boolean_mask(discriminator_real_classification_logits, tf.cast(one_hot_labels_real, dtype=tf.bool))
-    wrongs_real = tf.boolean_mask(discriminator_real_classification_logits, tf.cast(1-one_hot_labels_real, dtype=tf.bool))
-    wrongs_real = tf.reshape(wrongs_real, (-1, flags.FLAGS.num_classes-1))
-    max_wrong_real = tf.reduce_max(wrongs_real, axis=1)
-    hinged_real = tf.nn.relu(1 + max_wrong_real - target_real)
-    
+    target_real = tf.reduce_sum(discriminator_real_classification_logits * one_hot_labels_real, axis=1, keepdims=True)
+    hinged_real = tf.reduce_max((1 + discriminator_real_classification_logits - target_real) * (1 - one_hot_labels_real), axis=1)
+
     # generated
-    target_gen = tf.boolean_mask(discriminator_gen_classification_logits, tf.cast(one_hot_labels_gen, dtype=tf.bool))
-    wrongs_gen = tf.boolean_mask(discriminator_gen_classification_logits, tf.cast(1-one_hot_labels_gen, dtype=tf.bool))
-    wrongs_gen = tf.reshape(wrongs_gen, (-1, flags.FLAGS.num_classes-1))
-    max_wrong_gen = tf.reduce_max(wrongs_gen, axis=1)
-    hinged_gen = tf.nn.relu(1 + max_wrong_gen - target_gen)
+    target_gen = tf.reduce_sum(discriminator_gen_classification_logits * one_hot_labels_gen, axis=1, keepdims=True)
+    hinged_gen = tf.reduce_max((1 + discriminator_gen_classification_logits - target_gen) * (1 - one_hot_labels_gen), axis=1)
     
     loss_on_real = tf.compat.v1.losses.compute_weighted_loss(
         hinged_real,
@@ -594,14 +679,11 @@ def multihingegan_discriminator_loss(
   with tf.compat.v1.name_scope(
       scope, 'multihingegan_discriminator_loss',
       (discriminator_real_classification_logits,
-       discriminator_gen_classification_logits, one_hot_labels)) as scope:
+       discriminator_gen_classification_logits, one_hot_labels_real)) as scope:
 
     # real, should get the correct class
-    target_real = tf.boolean_mask(discriminator_real_classification_logits, tf.cast(one_hot_labels_real, dtype=tf.bool))
-    wrongs_real = tf.boolean_mask(discriminator_real_classification_logits, tf.cast(1-one_hot_labels_real, dtype=tf.bool))
-    wrongs_real = tf.reshape(wrongs_real, (-1, k-1))
-    max_wrong_real = tf.reduce_max(wrongs_real, axis=1)
-    hinged_real = tf.nn.relu(1 + max_wrong_real - target_real)
+    target_real = tf.reduce_sum(discriminator_real_classification_logits * one_hot_labels_real, axis=1, keepdims=True)
+    hinged_real = tf.reduce_max((1 + discriminator_real_classification_logits - target_real) * (1 - one_hot_labels_real), axis=1)
     
     # generated, should get the fake class
     one_hot_fake_class = tf.concat([tf.zeros_like(one_hot_labels_real[:,:(k-1)]), tf.ones_like(one_hot_labels_real[:,(k-1):k])], axis=1)
@@ -681,34 +763,35 @@ def multihingegan_ssl_discriminator_loss(
     TypeError: If the discriminator does not output a tuple.
   """
   k = flags.FLAGS.num_classes+1 if ('kplusone' in flags.FLAGS.critic_type) else flags.FLAGS.num_classes
-  one_hot_labels_real = one_hot_labels[:,:k]
+  
   with tf.compat.v1.name_scope(
-      scope, 'multihingegan_discriminator_loss',
+      scope, 'multihingegan_ssl_discriminator_loss',
       (discriminator_real_classification_logits,
        discriminator_gen_classification_logits,
        discriminator_unlabelled_classification_logits, one_hot_labels)) as scope:
+    one_hot_labels_real = one_hot_labels[:,:k]
 
-    # real, should get the correct class
-    target_real = tf.boolean_mask(discriminator_real_classification_logits, tf.cast(one_hot_labels_real, dtype=tf.bool))
-    wrongs_real = tf.boolean_mask(discriminator_real_classification_logits, tf.cast(1-one_hot_labels_real, dtype=tf.bool))
-    wrongs_real = tf.reshape(wrongs_real, (-1, k-1))
-    max_wrong_real = tf.reduce_max(wrongs_real, axis=1)
-    hinged_real = tf.nn.relu(1 + max_wrong_real - target_real)
-    
     # generated, should get the fake class
-    one_hot_fake_class = tf.concat([tf.zeros_like(one_hot_labels_real[:,:(k-1)]), tf.ones_like(one_hot_labels_real[:,(k-1):k])], axis=1)
-    target_gen = tf.boolean_mask(discriminator_gen_classification_logits, tf.cast(one_hot_fake_class, dtype=tf.bool))
-    wrongs_gen = tf.boolean_mask(discriminator_gen_classification_logits, tf.cast(1-one_hot_fake_class, dtype=tf.bool))
-    wrongs_gen = tf.reshape(wrongs_gen, (-1, k-1))
-    max_wrong_gen = tf.reduce_max(wrongs_gen, axis=1)
-    hinged_gen = tf.nn.relu(1 + max_wrong_gen - target_gen)
+    with tf.compat.v1.variable_scope('one_hot_fake_class'):
+      one_hot_fake_class = tf.concat([tf.zeros_like(one_hot_labels_real[:,:(k-1)]), tf.ones_like(one_hot_labels_real[:,(k-1):k])], axis=1)
+      target_gen = tf.boolean_mask(discriminator_gen_classification_logits, tf.cast(one_hot_fake_class, dtype=tf.bool))
+      wrongs_gen = tf.boolean_mask(discriminator_gen_classification_logits, tf.cast(1-one_hot_fake_class, dtype=tf.bool))
+      wrongs_gen = tf.reshape(wrongs_gen, (-1, k-1))
+      max_wrong_gen = tf.reduce_max(wrongs_gen, axis=1)
+      hinged_gen = tf.nn.relu(1 + max_wrong_gen - target_gen)
+      
+      # unlabelled, signs are flipped, Complement Cramer-Singer
+      target_unl = tf.boolean_mask(discriminator_unlabelled_classification_logits, tf.cast(one_hot_fake_class, dtype=tf.bool))
+      wrongs_unl = tf.boolean_mask(discriminator_unlabelled_classification_logits, tf.cast(1-one_hot_fake_class, dtype=tf.bool))
+      wrongs_unl = tf.reshape(wrongs_unl, (-1, k-1))
+      max_wrong_unl = tf.reduce_max(wrongs_unl, axis=1)
+      hinged_unl = tf.nn.relu(1 - max_wrong_unl + target_unl)
     
-    # unlabelled, signs are flipped, Complement Cramer-Singer
-    target_unl = tf.boolean_mask(discriminator_unlabelled_classification_logits, tf.cast(one_hot_fake_class, dtype=tf.bool))
-    wrongs_unl = tf.boolean_mask(discriminator_unlabelled_classification_logits, tf.cast(1-one_hot_fake_class, dtype=tf.bool))
-    wrongs_unl = tf.reshape(wrongs_unl, (-1, k-1))
-    max_wrong_unl = tf.reduce_max(wrongs_unl, axis=1)
-    hinged_unl = tf.nn.relu(1 - max_wrong_unl + target_unl)
+    # real, should get the correct class
+    with tf.compat.v1.variable_scope('one_hot_labels_real'):
+      target_real = tf.reduce_sum(discriminator_real_classification_logits * one_hot_labels_real, axis=1, keepdims=True)
+      hinged_real = tf.reduce_max((1 + discriminator_real_classification_logits - target_real) * (1 - one_hot_labels_real), axis=1)
+    
     
     loss_on_real = tf.compat.v1.losses.compute_weighted_loss(
         hinged_real,
@@ -777,8 +860,15 @@ def kplusone_featurematching_generator_loss(
       (discriminator_real_outputs, discriminator_gen_outputs,
        weights)) as scope:
     
-    loss = tf.compat.v1.losses.absolute_difference(discriminator_gen_outputs,
-        discriminator_real_outputs, weights, scope, loss_collection, reduction)
+    # hack to be compatible with reduction=NONE
+    mean_real_feature = tf.reduce_mean(discriminator_real_outputs, axis=0, keepdims=True)
+    mean_gen_feature = tf.reduce_mean(discriminator_gen_outputs, axis=0, keepdims=True)
+    N = tf.reduce_sum(tf.ones_like(discriminator_real_outputs))
+    fm = tf.reduce_sum(tf.ones_like(discriminator_real_outputs)/N * tf.abs(mean_real_feature - mean_gen_feature), axis=1)
+    
+    
+    loss = tf.compat.v1.losses.compute_weighted_loss(fm,
+        weights, scope, loss_collection, reduction)
 
     if add_summaries:
       tf.compat.v1.summary.scalar('kplusone_generator_fm_loss', loss)
@@ -816,12 +906,18 @@ def kplusone_ssl_featurematching_generator_loss(
     A loss Tensor. The shape depends on `reduction`.
   """
   with tf.compat.v1.name_scope(
-      scope, 'kplusone_generator_feature_matching_loss',
+      scope, 'kplusone_ssl_generator_feature_matching_loss',
       (discriminator_unlabelled_outputs, discriminator_gen_outputs,
        weights)) as scope:
     
-    loss = tf.compat.v1.losses.absolute_difference(discriminator_gen_outputs,
-        discriminator_unlabelled_outputs, weights, scope, loss_collection, reduction)
+    # hack to be compatible with reduction=NONE
+    mean_real_feature = tf.reduce_mean(discriminator_unlabelled_outputs, axis=0, keepdims=True)
+    mean_gen_feature = tf.reduce_mean(discriminator_gen_outputs, axis=0, keepdims=True)
+    N = tf.reduce_sum(tf.ones_like(discriminator_unlabelled_outputs))
+    fm = tf.reduce_sum(tf.ones_like(discriminator_unlabelled_outputs)/N * tf.abs(mean_real_feature - mean_gen_feature), axis=1)
+    
+    loss = tf.compat.v1.losses.compute_weighted_loss(fm,
+        weights, scope, loss_collection, reduction)
 
     if add_summaries:
       tf.compat.v1.summary.scalar('kplusone_generator_fm_loss', loss)

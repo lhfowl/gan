@@ -210,6 +210,7 @@ def generator_128(zs, target_class, gf_dim, num_classes, training=True):
 generators = {
   32: generator_32,
   64: generator_64,
+  128: generator_128,
 }
 
 generator = generators[flags.FLAGS.image_size]

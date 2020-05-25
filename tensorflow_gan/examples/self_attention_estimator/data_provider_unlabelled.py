@@ -40,7 +40,7 @@ def provide_dataset(batch_size, shuffle_buffer_size, split='train'):
   Returns:
     A dataset of num_batches batches of size batch_size of images and labels.
   """
-  shuffle = (split in ['train', tfds.Split.TRAIN])
+  shuffle = (split not in ['test', 'validation'])
   dataset = _load_dataset(split, flags.FLAGS.unlabelled_dataset_name, flags.FLAGS.data_dir,
                                    shuffle_files=shuffle)
   if shuffle:
@@ -49,7 +49,7 @@ def provide_dataset(batch_size, shuffle_buffer_size, split='train'):
   else:
     dataset = dataset.repeat()
   dataset = (dataset.map(_preprocess_dataset_record_fn(flags.FLAGS.image_size),
-                         num_parallel_calls=16 if shuffle else None)
+                         num_parallel_calls=16)
              .batch(batch_size, drop_remainder=True))
   dataset = dataset.prefetch(tf.data.experimental.AUTOTUNE)
   return dataset

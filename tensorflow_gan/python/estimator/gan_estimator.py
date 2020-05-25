@@ -266,13 +266,18 @@ def _make_gan_model(generator_fn, discriminator_fn, real_data, generator_inputs,
     generator_fn = functools.partial(generator_fn, mode=mode)
   if 'mode' in inspect.getargspec(discriminator_fn).args:
     discriminator_fn = functools.partial(discriminator_fn, mode=mode)
-  # TODO(ilyak): make using/not using unlabelled data a cmd line arg
-  gan_model = tfgan_train.ssl_acgan_model(
+  
+  k = flags.FLAGS.num_classes+1 if ('kplusone' in flags.FLAGS.critic_type) else flags.FLAGS.num_classes
+  if flags.FLAGS.unlabelled_dataset_name is not None:
+    which_acgan = tfgan_train.ssl_acgan_model
+  else:
+    which_acgan = tfgan_train.acgan_model
+  gan_model = which_acgan(
       generator_fn,
       discriminator_fn,
       real_data,
       generator_inputs,
-      one_hot_labels=tf.one_hot(real_data['labels'], 2*flags.FLAGS.num_classes),
+      one_hot_labels=tf.one_hot(real_data['labels'], 2*k),
       generator_scope=generator_scope,
       discriminator_scope=discriminator_scope,
       check_shapes=False)

@@ -12,10 +12,5 @@ python self_attention_estimator/train_experiment_main.py \
   --train_steps_per_eval=1000 \
   --model_dir=${OUTPUT_DIR} \
   --data_dir=${DATA_DIR} \
-  --image_size=32 \
-  --dataset_name=stl10 \
-  --dataset_val_split_name=test \
-  --unlabelled_dataset_name=stl10 \
-  --unlabelled_dataset_split_name=unlabelled \
-  --num_classes=10 \
+  ${DATASET_ARGS} \
   --alsologtostderr ${ADDITIONAL}

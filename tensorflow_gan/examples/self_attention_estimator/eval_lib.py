@@ -150,18 +150,19 @@ def predict_and_write_images(estimator, input_fn, model_dir, filename_suffix):
     filename_suffix: A suffix to append to the image file names.
   """
   # Generate images.
+  side = 8
   image_iterator = estimator.predict(input_fn)
   if isinstance(estimator, tfgan.estimator.TPUGANEstimator):
     predictions = np.array(
-        [next(image_iterator)['generated_data'] for _ in range(16)])
+        [next(image_iterator)['generated_data'] for _ in range(side*side)])
   else:
-    predictions = np.array([next(image_iterator) for _ in range(16)])
+    predictions = np.array([next(image_iterator) for _ in range(side*side)])
   # Write images to disk.
   output_dir = os.path.join(model_dir, 'images')
   if not tf.io.gfile.exists(output_dir):
     tf.io.gfile.makedirs(output_dir)
   # Generate a grid of images and write it to disk.
-  image_grid = tfgan.eval.python_image_grid(predictions, grid_shape=(4, 4))
+  image_grid = tfgan.eval.python_image_grid(predictions, grid_shape=(side, side))
   grid_fname = os.path.join(output_dir, 'grid_%s.png' % filename_suffix)
   _write_image_to_disk(image_grid, grid_fname)
 

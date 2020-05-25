@@ -399,7 +399,7 @@ def ssl_acgan_model(
           
   with tf.compat.v1.variable_scope(dis_scope, reuse=True):
     with tf.compat.v1.name_scope(dis_scope.name + '/unlabelled/'):
-      unlabelled_real_data = _convert_tensor_or_l_or_d({'images': real_data['unlabelled_images'], 'labels': real_data['labels']})
+      unlabelled_real_data = {'images': _convert_tensor_or_l_or_d(real_data['unlabelled_images']), 'labels': None}
       (discriminator_unlabelled_outputs, discriminator_unlabelled_classification_logits
       ) = _validate_acgan_discriminator_outputs(
           discriminator_fn(unlabelled_real_data, generator_inputs))
@@ -418,6 +418,7 @@ def ssl_acgan_model(
   
   k = flags.FLAGS.num_classes+1 if ('kplusone' in flags.FLAGS.critic_type) else flags.FLAGS.num_classes
   one_hot_labels = tf.concat([tf.one_hot(real_data['labels'], k), tf.one_hot(generated_data['labels'], k)], axis=1)
+  # one_hot_labels = tf.concat([one_hot_labels[:,:k], tf.one_hot(generated_data['labels'], k)], axis=1)
   return namedtuples.SSLACGANModel(
       generator_inputs, generated_data, generator_variables, gen_scope,
       generator_fn, real_data, discriminator_real_outputs,

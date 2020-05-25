@@ -183,6 +183,8 @@ wasserstein_hinge_discriminator_loss = args_to_gan_model(
     tfgan_losses.wasserstein_hinge_discriminator_loss)
 wasserstein_gradient_penalty = args_to_gan_model(
     tfgan_losses.wasserstein_gradient_penalty)
+ssl_wasserstein_hinge_discriminator_loss = args_to_gan_model(
+    tfgan_losses.ssl_wasserstein_hinge_discriminator_loss)
 
 # ACGAN losses from `Conditional Image Synthesis With Auxiliary Classifier GANs`
 # (https://arxiv.org/abs/1610.09585).
