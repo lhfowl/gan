@@ -266,8 +266,8 @@ def _make_gan_model(generator_fn, discriminator_fn, real_data, generator_inputs,
     generator_fn = functools.partial(generator_fn, mode=mode)
   if 'mode' in inspect.getargspec(discriminator_fn).args:
     discriminator_fn = functools.partial(discriminator_fn, mode=mode)
-  # pdb.set_trace() # one
-  gan_model = tfgan_train.acgan_model(
+  # TODO(ilyak): make using/not using unlabelled data a cmd line arg
+  gan_model = tfgan_train.ssl_acgan_model(
       generator_fn,
       discriminator_fn,
       real_data,

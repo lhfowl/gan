@@ -102,18 +102,19 @@ def get_gpu_estimator(generator, discriminator, hparams, config):
         if isinstance(generated_data, dict) else generated_data)
     metrics.update(_generator_summary_ops(gen_images, real_images))
     return metrics
-
-  if flags.FLAGS.critic_type == 'kplusone_wgan':
-    generator_loss_fn=tuple_losses.kplusone_wasserstein_generator_loss
+    
+  gen_losses = {
+    'kplusone_wasserstein_generator_loss' :tuple_losses.kplusone_wasserstein_generator_loss,
+    'kplusone_featurematching_generator_loss' :tuple_losses.kplusone_featurematching_generator_loss,
+    'kplusone_ssl_featurematching_generator_loss' :tuple_losses.kplusone_ssl_featurematching_generator_loss
+  }
+  if flags.FLAGS.generator_loss_fn is not None:
+    generator_loss_fn = gen_losses[flags.FLAGS.generator_loss_fn]
     discriminator_loss_fn=tfgan_losses.no_loss
-  elif flags.FLAGS.critic_type == 'kplusone_fm':
-    generator_loss_fn=tuple_losses.kplusone_featurematching_generator_loss
-    discriminator_loss_fn=tfgan_losses.no_loss
-  elif flags.FLAGS.critic_type == 'acgan':
-    generator_loss_fn=tfgan.losses.wasserstein_hinge_generator_loss
+  else: #acgan mode
+    assert flags.FLAGS.critic_type == 'acgan', '--generator_loss_fn cannot be None for non-acgan critic'
+    generator_loss_fn=tuple_losses.wasserstein_hinge_generator_loss
     discriminator_loss_fn=tfgan.losses.wasserstein_hinge_discriminator_loss
-  else:
-    raise ValueError('No loss is supported for critic type: %s.' % flags.FLAGS.critic_type)
 
   return tfgan.estimator.GANEstimator(
       generator_fn=generator,

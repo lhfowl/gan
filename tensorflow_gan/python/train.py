@@ -292,7 +292,7 @@ def acgan_model(
       (discriminator_gen_outputs, discriminator_gen_classification_logits
       ) = _validate_acgan_discriminator_outputs(
           discriminator_fn(generated_data, generator_inputs))
-  # pdb.set_trace()
+  
   with tf.compat.v1.variable_scope(dis_scope, reuse=True):
     with tf.compat.v1.name_scope(dis_scope.name + '/real/'):
       real_data = _convert_tensor_or_l_or_d(real_data)
@@ -321,6 +321,112 @@ def acgan_model(
       discriminator_fn, one_hot_labels,
       discriminator_real_classification_logits,
       discriminator_gen_classification_logits)
+
+def ssl_acgan_model(
+    # Lambdas defining models.
+    generator_fn,
+    discriminator_fn,
+    # Real data and conditioning.
+    real_data,
+    generator_inputs,
+    one_hot_labels,
+    # Optional scopes.
+    generator_scope='Generator',
+    discriminator_scope='Discriminator',
+    # Options.
+    check_shapes=True):
+  """Returns an SSLACGANModel contains all the pieces needed for SSL ACGAN training.
+
+  The `acgan_model` is the same as the `gan_model` with the only difference
+  being that the discriminator additionally outputs logits to classify the input
+  (real or generated).
+  Therefore, an explicit field holding one_hot_labels is necessary, as well as a
+  discriminator_fn that outputs a 2-tuple holding the logits for real/fake and
+  classification.
+
+  See https://arxiv.org/abs/1610.09585 for more details.
+
+  Args:
+    generator_fn: A python lambda that takes `generator_inputs` as inputs and
+      returns the outputs of the GAN generator.
+    discriminator_fn: A python lambda that takes `real_data`/`generated data`
+      and `generator_inputs`. Outputs a tuple consisting of two Tensors:
+        (1) real/fake logits in the range [-inf, inf]
+        (2) classification logits in the range [-inf, inf]
+    real_data: A Tensor representing the real data.
+    generator_inputs: A Tensor or list of Tensors to the generator. In the
+      vanilla GAN case, this might be a single noise Tensor. In the conditional
+      GAN case, this might be the generator's conditioning.
+    one_hot_labels: A Tensor holding one-hot-labels for the batch. Needed by
+      acgan_loss.
+    generator_scope: Optional generator variable scope. Useful if you want to
+      reuse a subgraph that has already been created.
+    discriminator_scope: Optional discriminator variable scope. Useful if you
+      want to reuse a subgraph that has already been created.
+    check_shapes: If `True`, check that generator produces Tensors that are the
+      same shape as real data. Otherwise, skip this check.
+
+  Returns:
+    A SSLACGANModel namedtuple.
+
+  Raises:
+    ValueError: If the generator outputs a Tensor that isn't the same shape as
+      `real_data`.
+    TypeError: If the discriminator does not output a tuple consisting of
+      (discrimination logits, classification logits).
+    ValueError: If TF is executing eagerly.
+  """
+  if tf.executing_eagerly():
+    raise ValueError('`tfgan.acgan_model` doesn\'t work when executing '
+                     'eagerly.')
+
+  # Create models
+  with tf.compat.v1.variable_scope(generator_scope) as gen_scope:
+    generator_inputs = _convert_tensor_or_l_or_d(generator_inputs)
+    generated_data = generator_fn(generator_inputs)
+  with tf.compat.v1.variable_scope(discriminator_scope) as dis_scope:
+    with tf.compat.v1.name_scope(dis_scope.name + '/generated/'):
+      (discriminator_gen_outputs, discriminator_gen_classification_logits
+      ) = _validate_acgan_discriminator_outputs(
+          discriminator_fn(generated_data, generator_inputs))
+
+  with tf.compat.v1.variable_scope(dis_scope, reuse=True):
+    with tf.compat.v1.name_scope(dis_scope.name + '/real/'):
+      real_data = _convert_tensor_or_l_or_d(real_data)
+      (discriminator_real_outputs, discriminator_real_classification_logits
+      ) = _validate_acgan_discriminator_outputs(
+          discriminator_fn(real_data, generator_inputs))
+          
+  with tf.compat.v1.variable_scope(dis_scope, reuse=True):
+    with tf.compat.v1.name_scope(dis_scope.name + '/unlabelled/'):
+      unlabelled_real_data = _convert_tensor_or_l_or_d({'images': real_data['unlabelled_images'], 'labels': real_data['labels']})
+      (discriminator_unlabelled_outputs, discriminator_unlabelled_classification_logits
+      ) = _validate_acgan_discriminator_outputs(
+          discriminator_fn(unlabelled_real_data, generator_inputs))
+  
+  if check_shapes:
+    if not generated_data.shape.is_compatible_with(real_data.shape):
+      raise ValueError(
+          'Generator output shape (%s) must be the same shape as real data '
+          '(%s).' % (generated_data.shape, real_data.shape))
+
+  # Get model-specific variables.
+  generator_variables = contrib.get_trainable_variables(
+      gen_scope)
+  discriminator_variables = contrib.get_trainable_variables(
+      dis_scope)
+  
+  k = flags.FLAGS.num_classes+1 if ('kplusone' in flags.FLAGS.critic_type) else flags.FLAGS.num_classes
+  one_hot_labels = tf.concat([tf.one_hot(real_data['labels'], k), tf.one_hot(generated_data['labels'], k)], axis=1)
+  return namedtuples.SSLACGANModel(
+      generator_inputs, generated_data, generator_variables, gen_scope,
+      generator_fn, real_data, discriminator_real_outputs,
+      discriminator_gen_outputs, discriminator_variables, dis_scope,
+      discriminator_fn, one_hot_labels,
+      discriminator_real_classification_logits,
+      discriminator_gen_classification_logits,
+      discriminator_unlabelled_outputs,
+      discriminator_unlabelled_classification_logits)
 
 
 def cyclegan_model(
@@ -601,6 +707,7 @@ def gan_loss(
     aux_mhinge_cond_generator_weight=flags.FLAGS.aux_mhinge_cond_generator_weight,
     aux_mhinge_cond_discriminator_weight=flags.FLAGS.aux_mhinge_cond_discriminator_weight,
     kplusone_mhinge_cond_discriminator_weight=flags.FLAGS.kplusone_mhinge_cond_discriminator_weight,
+    kplusone_mhinge_ssl_cond_discriminator_weight=flags.FLAGS.kplusone_mhinge_ssl_cond_discriminator_weight,
     tensor_pool_fn=None,
     # Options.
     reduction=tf.compat.v1.losses.Reduction.SUM_BY_NONZERO_WEIGHTS,
@@ -669,6 +776,8 @@ def gan_loss(
       aux_mhinge_cond_discriminator_weight, 'aux_mhinge_cond_discriminator_weight')
   kplusone_mhinge_cond_discriminator_weight = _validate_aux_loss_weight(
       kplusone_mhinge_cond_discriminator_weight, 'kplusone_mhinge_cond_discriminator_weight')
+  kplusone_mhinge_ssl_cond_discriminator_weight = _validate_aux_loss_weight(
+      kplusone_mhinge_ssl_cond_discriminator_weight, 'kplusone_mhinge_ssl_cond_discriminator_weight')
 
   # Verify configuration for mutual information penalty
   if (_use_aux_loss(mutual_information_penalty_weight) and
@@ -683,13 +792,18 @@ def gan_loss(
        _use_aux_loss(aux_mhinge_cond_generator_weight) or
        _use_aux_loss(aux_mhinge_cond_discriminator_weight) or
        _use_aux_loss(kplusone_mhinge_cond_discriminator_weight)) and
-      not isinstance(model, namedtuples.ACGANModel)):
+      not (isinstance(model, namedtuples.ACGANModel) or isinstance(model, namedtuples.SSLACGANModel))):
     raise ValueError(
         'When `(aux|kplusone)_(mhinge_)cond_(generator|discriminator)_weight` '
-        'is provided, `model` must be an `ACGANModel`. Instead, was %s.' %
+        'is provided, `model` must be an `(SSL)ACGANModel`. Instead, was %s.' %
         type(model))
-  
-  # Verify configuration for kplusone situation
+        
+  if ((_use_aux_loss(kplusone_mhinge_ssl_cond_discriminator_weight)) and
+      not isinstance(model, namedtuples.SSLACGANModel)):
+    raise ValueError(
+        'When `kplusone_mhinge_ssl_cond_discriminator_weight` '
+        'is provided, `model` must be an `SSLACGANModel`. Instead, was %s.' %
+        type(model))
 
   # Optionally create pooled model.
   if tensor_pool_fn:
@@ -757,6 +871,10 @@ def gan_loss(
     kplusone_disc_loss = tuple_losses.multihingegan_discriminator_loss(
         pooled_model, reduction=reduction, add_summaries=add_summaries)
     dis_loss += kplusone_mhinge_cond_discriminator_weight * kplusone_disc_loss
+  if _use_aux_loss(kplusone_mhinge_ssl_cond_discriminator_weight):
+    kplusone_disc_loss = tuple_losses.multihingegan_ssl_discriminator_loss(
+        pooled_model, reduction=reduction, add_summaries=add_summaries)
+    dis_loss += kplusone_mhinge_ssl_cond_discriminator_weight * kplusone_disc_loss
   # Gathers auxiliary losses.
   if model.generator_scope:
     gen_reg_loss = tf.compat.v1.losses.get_regularization_loss(

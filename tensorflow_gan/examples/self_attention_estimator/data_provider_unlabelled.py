@@ -41,7 +41,7 @@ def provide_dataset(batch_size, shuffle_buffer_size, split='train'):
     A dataset of num_batches batches of size batch_size of images and labels.
   """
   shuffle = (split in ['train', tfds.Split.TRAIN])
-  dataset = _load_dataset(split, flags.FLAGS.dataset_name, flags.FLAGS.data_dir,
+  dataset = _load_dataset(split, flags.FLAGS.unlabelled_dataset_name, flags.FLAGS.data_dir,
                                    shuffle_files=shuffle)
   if shuffle:
     dataset = dataset.apply(
@@ -125,7 +125,7 @@ def _preprocess_dataset_record_fn(image_size):
     # crop_and_resize returns a tensor of type tf.float32.
     image = tf.squeeze(image, axis=0)
     image = image * (2. / 255) - 1.
-    label = tf.cast(record['label'], tf.int32)
-    return image, label
+    # label = tf.cast(record['label'], tf.int32)
+    return image #, label
 
   return _process_record

@@ -203,6 +203,10 @@ kplusone_wasserstein_generator_loss = args_to_gan_model(
     tfgan_losses.kplusone_wasserstein_generator_loss)
 kplusone_featurematching_generator_loss = args_to_gan_model(
     tfgan_losses.kplusone_featurematching_generator_loss)
+multihingegan_ssl_discriminator_loss = args_to_gan_model(
+    tfgan_losses.multihingegan_ssl_discriminator_loss)
+kplusone_ssl_featurematching_generator_loss = args_to_gan_model(
+    tfgan_losses.kplusone_ssl_featurematching_generator_loss)
 
 
 # Original losses from `Generative Adversarial Nets`

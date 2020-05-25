@@ -119,7 +119,17 @@ flags.DEFINE_enum(
     '...')
 flags.DEFINE_float('kplusone_mhinge_cond_discriminator_weight', None, 
                    '..., default is None.')
-                   
+# unlabelled data
+flags.DEFINE_string('unlabelled_dataset_name', None,
+                    'If set use unlabelled data.')
+flags.DEFINE_string('unlabelled_dataset_split_name', 'unlabelled',
+                    'Which dataset to use. imagenet2012 is default.')
+flags.DEFINE_float('kplusone_mhinge_ssl_cond_discriminator_weight', None, 
+                   '..., default is None.')
+flags.DEFINE_enum(
+    'generator_loss_fn', None, ['kplusone_wasserstein_generator_loss', 'kplusone_featurematching_generator_loss', 'kplusone_ssl_featurematching_generator_loss'],
+    '...')
+
 
 FLAGS = flags.FLAGS
 

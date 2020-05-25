@@ -116,6 +116,20 @@ class ACGANModel(
     discriminator_gen_classification_logits: Classification logits for generated
       data.
   """
+  
+class SSLACGANModel(
+    collections.namedtuple('SSLACGANModel', ACGANModel._fields +
+                           ('discriminator_unlabelled_outputs',
+                            'discriminator_unlabelled_classification_logits',))):
+  """An SSLACGANModel contains all the pieces needed for SSL ACGAN training.
+
+  See https://arxiv.org/abs/1610.09585 and ... for more details.
+
+  Args:
+    discriminator_unlabelled_outputs: The discriminator's output on unlabelled data.
+    discriminator_unlabelled_classification_logits: Classification logits for unlabelled
+      data.
+  """
 
 
 class CycleGANModel(

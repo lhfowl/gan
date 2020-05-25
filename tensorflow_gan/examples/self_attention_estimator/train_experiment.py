@@ -25,7 +25,7 @@ import time
 
 import tensorflow as tf  # tf
 from tensorflow_gan.examples import evaluation_helper as evaluation
-from tensorflow_gan.examples.self_attention_estimator import data_provider
+from tensorflow_gan.examples.self_attention_estimator import data_provider, data_provider_unlabelled
 from tensorflow_gan.examples.self_attention_estimator import discriminator as dis_module
 from tensorflow_gan.examples.self_attention_estimator import estimator_lib as est_lib
 from tensorflow_gan.examples.self_attention_estimator import eval_lib
@@ -127,9 +127,14 @@ def train_eval_input_fn(mode, params):
       bs,
       shuffle_buffer_size=params['shuffle_buffer_size'],
       split=split)
-  images_ds = images_ds.map(
-      lambda img, lbl: {'images': img, 'labels': lbl})  # map to dict.
-
+  unl_images_ds = data_provider_unlabelled.provide_dataset(
+      bs,
+      shuffle_buffer_size=params['shuffle_buffer_size'],
+      split=flags.FLAGS.unlabelled_dataset_split_name)
+  
+  
+  images_ds = tf.data.Dataset.zip((images_ds, unl_images_ds))
+  images_ds = images_ds.map( lambda img_lab_tup, unl_img: {'images': img_lab_tup[0], 'labels': img_lab_tup[1], 'unlabelled_images': unl_img})  # map to dict.
   ds = tf.data.Dataset.zip((noise_ds, images_ds))
   _verify_dataset_shape(ds, params['z_dim'])
   return ds
