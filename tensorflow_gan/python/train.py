@@ -418,7 +418,6 @@ def ssl_acgan_model(
   
   k = flags.FLAGS.num_classes+1 if ('kplusone' in flags.FLAGS.critic_type) else flags.FLAGS.num_classes
   one_hot_labels = tf.concat([tf.one_hot(real_data['labels'], k), tf.one_hot(generated_data['labels'], k)], axis=1)
-  # one_hot_labels = tf.concat([one_hot_labels[:,:k], tf.one_hot(generated_data['labels'], k)], axis=1)
   return namedtuples.SSLACGANModel(
       generator_inputs, generated_data, generator_variables, gen_scope,
       generator_fn, real_data, discriminator_real_outputs,
