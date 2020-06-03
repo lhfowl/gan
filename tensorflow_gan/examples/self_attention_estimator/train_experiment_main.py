@@ -28,6 +28,9 @@ from __future__ import print_function
 from absl import app
 from absl import flags
 
+import logging
+import os
+
 flags.DEFINE_string('model_dir', '/tmp/tfgan_logdir/sagan-estimator',
                     'Optional location to save model. If `None`, use a '
                     'default provided by tf.Estimator.')
@@ -53,7 +56,7 @@ flags.DEFINE_float('beta1', 0.0, 'Momentum term of adam. [0.0]')
 
 # ML Infra.
 flags.DEFINE_enum(
-    'mode', None, ['train', 'continuous_eval', 'train_and_eval'],
+    'mode', None, ['train', 'continuous_eval', 'train_and_eval', 'intra_fid_eval', 'gen_images', 'gen_matrices'],
     'Mode to run in. `train` just trains the model. `continuous_eval` '
     'continuously looks for new checkpoints and computes eval metrics and '
     'writes sample outputs to disk. `train_and_eval` does both. '
@@ -111,38 +114,58 @@ flags.DEFINE_float('aux_cond_generator_weight', None,
 flags.DEFINE_float('aux_cond_discriminator_weight', None, 
                    'How to scale the critic ACGAN loss relative to WGAN loss, default is None. Try 1.0')
 flags.DEFINE_float('aux_mhinge_cond_generator_weight', None,
-                   '..., default is None.')
+                   'How to scale generator Multi-Hinge GAN loss relative to WGAN loss, default is None.')
 flags.DEFINE_float('aux_mhinge_cond_discriminator_weight', None, 
-                   '..., default is None.')
+                   'How to scale generator Multi-Hinge GAN loss relative to WGAN loss, default is None., default is None.')
 flags.DEFINE_enum(
-    'critic_type', 'acgan', ['acgan', 'kplusone_fm', 'kplusone_wgan', 'acgan_noproj'],
-    '...')
+    'critic_type', 'acgan', ['acgan', 'kplusone_fm', 'kplusone_wgan', 'acgan_noproj', 'acgan_multiproj'],
+    'Use this oprtion to switch between architectures for D and G.')
 flags.DEFINE_float('kplusone_mhinge_cond_discriminator_weight', None, 
-                   '..., default is None.')
+                   'When using a K+1 GAN, how to scale the MHingeGAN loss. Default is None.')
 # unlabelled data
 flags.DEFINE_string('unlabelled_dataset_name', None,
                     'If set use unlabelled data.')
 flags.DEFINE_string('unlabelled_dataset_split_name', 'unlabelled',
-                    '...')
+                    'The split in the tensorflowdatasets dataset to use as unlabelled.')
 flags.DEFINE_float('kplusone_mhinge_ssl_cond_discriminator_weight', None, 
-                   '..., default is None.')
+                   'When using a K+1 GAN in a SSL setting, how to scale the MHingeGAN loss. Default is None.')
 flags.DEFINE_enum(
     'generator_loss_fn', None, ['kplusone_wasserstein_generator_loss', 'kplusone_featurematching_generator_loss', 'kplusone_ssl_featurematching_generator_loss'],
-    '...')
-flags.DEFINE_integer(
-    'tpu_gan_estimator_d_step', 1,
-    '...')
+    'Use this arg when you are not using an ACGAN to override the generator loss. Used for K+1 GANS.')
+flags.DEFINE_integer( 'tpu_gan_estimator_d_step', 1, 'For TPU execution only, control number of discriminator steps. This feature is unsupported on GPU.')
+flags.DEFINE_integer( 'tpu_gan_estimator_g_step', 1, 'For TPU execution only, control number of discriminator steps. This feature is unsupported on GPU.')
 flags.DEFINE_float('generator_margin_size', 1.0, 'Used in achingegan_generator_loss.')
+flags.DEFINE_integer( 'intra_fid_eval_chunk_size', None, 'The number of classes for which to compute a FID score within the class. This allows processing batches of FID scores in parallel for speed improvements.')
+flags.DEFINE_integer( 'tfdf_num_parallel_calls', 16, '...')
+flags.DEFINE_integer( 'n_images_per_side_to_gen_per_class', None, 'When exporting images, this is the number of images per side of the square exported. This is useful when exporting a collage of images per class. It should be set to the square root of the eval batch size.')
+flags.DEFINE_bool('gen_images_with_margins', False, 'When exporting images per class, if this option is true the images will be sorted by the size of their classification margin.')
+flags.DEFINE_bool('extra_eval_metrics', False, 'Perform extra eval metrics like accuracy.')
+flags.DEFINE_integer( 'keep_checkpoint_max', 5, 'Number of most recent checkpoints to keep. Others will be deleted.')
+
 
 
 FLAGS = flags.FLAGS
 
-
-
 def main(_):
   from tensorflow_gan.examples.self_attention_estimator import train_experiment
+  
+  # get TF logger
+  log = logging.getLogger('tensorflow')
+  log.setLevel(logging.INFO)
+  
+  # create formatter and add it to the handlers
+  formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+  
+  # create file handler
+  logging_dir = os.environ['HOME'] if FLAGS.use_tpu else FLAGS.model_dir
+  fh = logging.FileHandler(logging_dir + '/tensorflow.log')
+  fh.setLevel(logging.INFO)
+  fh.setFormatter(formatter)
+  log.addHandler(fh)
     
   tpu_location = FLAGS.tpu
+  if ',' in tpu_location:
+    tpu_location = tpu_location.split(',')
   hparams = train_experiment.HParams(
       train_batch_size=FLAGS.train_batch_size,
       eval_batch_size=FLAGS.eval_batch_size,
@@ -178,8 +201,14 @@ def main(_):
     train_experiment.run_train(hparams)
   elif FLAGS.mode == 'continuous_eval':
     train_experiment.run_continuous_eval(hparams)
+  elif FLAGS.mode == 'intra_fid_eval':
+    train_experiment.run_intra_fid_eval(hparams)
   elif FLAGS.mode == 'train_and_eval' or FLAGS.mode is None:
     train_experiment.run_train_and_eval(hparams)
+  elif FLAGS.mode == 'gen_images':
+    train_experiment.gen_images(hparams)
+  elif FLAGS.mode == 'gen_matrices':
+    train_experiment.gen_matrices(hparams)
   else:
     raise ValueError('Mode not recognized: ', FLAGS.mode)
 

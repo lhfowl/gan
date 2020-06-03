@@ -47,7 +47,7 @@ def get_activations(get_images_fn, num_batches, get_logits=False):
   # Image resizing happens inside the Inception SavedModel.
   outputs = tfgan.eval.sample_and_run_inception(
       sample_fn=lambda _: get_images_fn(),
-      sample_inputs=[1.0] * num_batches)  # dummy inputs
+      sample_inputs=[1.0] * num_batches)  # dummy inputs to sample_fn
   if get_logits:
     return outputs['logits'], outputs['pool_3']
   else:
@@ -137,7 +137,6 @@ def log_and_summarize_variables(var_list, dbg_messge, on_tpu):
       for var in sigma_ratio_vars:
         tf.compat.v1.summary.scalar('sigma_ratio_vars/' + var.name, var)
 
-
 def predict_and_write_images(estimator, input_fn, model_dir, filename_suffix):
   """Generates images and write them to the model dir.
 
@@ -151,20 +150,26 @@ def predict_and_write_images(estimator, input_fn, model_dir, filename_suffix):
   """
   # Generate images.
   side = 8
+  number = 1
+  if flags.FLAGS.mode == 'gen_images' and flags.FLAGS.n_images_per_side_to_gen_per_class is not None:
+    side = flags.FLAGS.n_images_per_side_to_gen_per_class
+    number = flags.FLAGS.num_classes
   image_iterator = estimator.predict(input_fn)
-  if isinstance(estimator, tfgan.estimator.TPUGANEstimator):
-    predictions = np.array(
-        [next(image_iterator)['generated_data'] for _ in range(side*side)])
-  else:
-    predictions = np.array([next(image_iterator) for _ in range(side*side)])
-  # Write images to disk.
-  output_dir = os.path.join(model_dir, 'images')
-  if not tf.io.gfile.exists(output_dir):
-    tf.io.gfile.makedirs(output_dir)
-  # Generate a grid of images and write it to disk.
-  image_grid = tfgan.eval.python_image_grid(predictions, grid_shape=(side, side))
-  grid_fname = os.path.join(output_dir, 'grid_%s.png' % filename_suffix)
-  _write_image_to_disk(image_grid, grid_fname)
+  for n in range(number):
+    if isinstance(estimator, tfgan.estimator.TPUGANEstimator):
+      predictions = np.array(
+          [next(image_iterator)['generated_data'] for _ in range(side*side)])
+    else:
+      predictions = np.array([next(image_iterator) for _ in range(side*side)])
+    
+    # Write images to disk.
+    output_dir = os.path.join(model_dir, 'images')
+    if not tf.io.gfile.exists(output_dir):
+      tf.io.gfile.makedirs(output_dir)
+    # Generate a grid of images and write it to disk.
+    image_grid = tfgan.eval.python_image_grid(predictions, grid_shape=(side, side))
+    grid_fname = os.path.join(output_dir, 'grid_{:04d}_{}.png'.format(n, filename_suffix) )
+    _write_image_to_disk(image_grid, grid_fname)
 
 
 def _write_image_to_disk(image, filename):

@@ -28,7 +28,11 @@ import tensorflow_gan as tfgan  # tf
 from tensorflow_gan.python.losses import losses_impl as tfgan_losses
 from tensorflow_gan.python.losses import tuple_losses
 
+import tensorflow_gan.python.eval.classifier_metrics as tfgan_eval
+
 from absl import flags
+
+import pdb
 
 def get_tpu_run_config_from_hparams(hparams):
   """Create a TPU-suitable RunConfig from HParams."""
@@ -46,6 +50,7 @@ def get_tpu_run_config_from_hparams(hparams):
     eval_training_input_configuration = tf.compat.v1.estimator.tpu.InputPipelineConfig.PER_HOST_V1
   return tf.compat.v1.estimator.tpu.RunConfig(
       model_dir=hparams.model_dir,
+      keep_checkpoint_max=flags.FLAGS.keep_checkpoint_max,
       cluster=cluster_resolver,
       save_checkpoints_steps=hparams.train_steps_per_eval,
       tpu_config=tf.compat.v1.estimator.tpu.TPUConfig(
@@ -57,6 +62,7 @@ def get_run_config_from_hparams(hparams):
   mirrored_strategy = tf.distribute.MirroredStrategy()
   return tf.estimator.RunConfig(
       model_dir=hparams.model_dir,
+      keep_checkpoint_max=flags.FLAGS.keep_checkpoint_max,
       save_checkpoints_steps=hparams.train_steps_per_eval,
       train_distribute=mirrored_strategy)
 
@@ -105,8 +111,10 @@ def get_gpu_estimator(generator, discriminator, hparams, config):
     """A function compatible with GANEstimator's get_eval_metric_ops_fn arg."""
     metrics_arguments = prepare_metric_arguments(
         gan_model.generator_inputs, gan_model.generated_data,
-        gan_model.real_data, gan_model.discriminator_real_outputs,
-        gan_model.discriminator_gen_outputs)
+        gan_model.real_data,
+        gan_model.discriminator_real_outputs,
+        gan_model.discriminator_real_classification_logits,
+        gan_model.discriminator_gen_classification_logits)
     metrics = get_metrics(hparams=hparams, **metrics_arguments)
     # Generate image summaries.
     real_data = gan_model.real_data
@@ -148,7 +156,8 @@ def get_gpu_estimator(generator, discriminator, hparams, config):
 
 def prepare_metric_arguments(generator_inputs, generated_data, real_data,
                              discriminator_real_outputs,
-                             discriminator_gen_outputs):
+                             discriminator_real_classifier_outputs,
+                             discriminator_gen_classifier_outputs):
   """Prepares the arguments needed for get_metrics.
 
   When training on TPUs, this function should be executed on TPU.
@@ -163,12 +172,17 @@ def prepare_metric_arguments(generator_inputs, generated_data, real_data,
   Returns:
     A metric dictionary.
   """
-  del generator_inputs, discriminator_real_outputs, discriminator_gen_outputs
+  del generator_inputs
 
   real_images = (real_data['images'] if isinstance(real_data, dict) else
                  real_data)
   gen_images = (generated_data['images'] if isinstance(generated_data, dict)
                 else generated_data)
+  # labels
+  real_labels = (real_data['labels'] if isinstance(real_data, dict) else
+                None)
+  gen_labels = (generated_data['labels'] if isinstance(generated_data, dict)
+                else None)
   # Get logits and pools for real and generated images.
   real_logits, real_pools = eval_lib.get_activations(
       lambda: real_images, num_batches=1, get_logits=True)
@@ -179,11 +193,18 @@ def prepare_metric_arguments(generator_inputs, generated_data, real_data,
       'real_logits': real_logits,
       'real_pools': real_pools,
       'fake_logits': fake_logits,
-      'fake_pools': fake_pools
+      'fake_pools': fake_pools,
+      'real_labels': real_labels,
+      'fake_labels': gen_labels,
+      'real_disc_out': discriminator_real_outputs,
+      'real_disc_logits': discriminator_real_classifier_outputs,
+      'fake_disc_logits': discriminator_gen_classifier_outputs,
   }
 
 
-def get_metrics(real_logits, real_pools, fake_logits, fake_pools, hparams):
+def get_metrics(real_logits, real_pools, fake_logits, fake_pools,
+                real_labels, fake_labels, real_disc_out,
+                real_disc_logits, fake_disc_logits, hparams):
   """Return metrics for SAGAN experiment on TPU, CPU, or GPU.
 
   When training on TPUs, this function should be executed on the CPU.
@@ -199,6 +220,7 @@ def get_metrics(real_logits, real_pools, fake_logits, fake_pools, hparams):
     A metric dictionary.
   """
   del hparams
+  real_labels = tf.cast(real_labels, tf.int64)
   metric_dict = {
       'eval/real_incscore':
           tfgan.eval.classifier_score_from_logits_streaming(real_logits),
@@ -208,6 +230,24 @@ def get_metrics(real_logits, real_pools, fake_logits, fake_pools, hparams):
           tfgan.eval.frechet_classifier_distance_from_activations_streaming(
               real_pools, fake_pools),
   }
+  # inception has 1008 outputs: https://github.com/tensorflow/tensorflow/issues/4128
+  # for imagenet_resized should use logits 1:1001 and compare to fake_labels
+
+  if flags.FLAGS.extra_eval_metrics:
+    metric_dict['eval/generator_self_acc'] = tfgan_eval.accuracy_score_from_logits_streaming(fake_disc_logits, fake_labels)
+    metric_dict['eval/discriminator_val_acc'] = tfgan_eval.accuracy_score_from_logits_streaming(real_disc_logits, real_labels)
+    metric_dict['eval/val_real'] = tfgan_eval.percent_real_streaming(real_disc_out)
+    if 'imagenet_resized' in flags.FLAGS.dataset_name: 
+      metric_dict['eval/generator_inception_acc'] = tfgan_eval.accuracy_score_from_logits_streaming(fake_logits[:,1:1001], fake_labels)
+  if flags.FLAGS.mode == 'intra_fid_eval':
+    nclass = flags.FLAGS.intra_fid_eval_chunk_size
+    metric_dict = {
+      'eval/intra_fid':
+          tfgan_eval.intra_class_frechet_classifier_distance_from_activations_streaming(
+            real_pools, fake_pools, real_labels, fake_labels, nclass)
+    }
+    
+
   return metric_dict
 
 

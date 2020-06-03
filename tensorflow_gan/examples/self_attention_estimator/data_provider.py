@@ -19,16 +19,23 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
+import functools
+
 from absl import flags
 import tensorflow as tf  # tf
 import tensorflow_datasets as tfds
 
 from tensorflow_gan.examples import compat_utils
 
+import pdb
 
+def allowed_labels_predicate(x, allowed_labels=tf.constant([0, 1])):
+    label = x['label']
+    isallowed = tf.equal(allowed_labels, tf.cast(label, tf.int32))
+    reduced = tf.reduce_sum(tf.cast(isallowed, tf.float32))
+    return tf.greater(reduced, tf.constant(0.))
 
-
-def provide_dataset(batch_size, shuffle_buffer_size, split='train'):
+def provide_dataset(batch_size, shuffle_buffer_size, split='train', restrict_classes=None):
   """Provides dataset of ImageNet digits that were preprocessed by the Red Team.
 
   Args:
@@ -41,15 +48,21 @@ def provide_dataset(batch_size, shuffle_buffer_size, split='train'):
     A dataset of num_batches batches of size batch_size of images and labels.
   """
   shuffle = (split not in ['test', 'validation'])
+  if restrict_classes is not None: # things for intra-fid
+    shuffle = False
+    split = 'train'
   dataset = _load_dataset(split, flags.FLAGS.dataset_name, flags.FLAGS.data_dir,
                                    shuffle_files=shuffle)
+  if restrict_classes is not None:
+    predicate = functools.partial(allowed_labels_predicate, allowed_labels=tf.constant(restrict_classes))
+    dataset = dataset.filter(predicate)
   if shuffle:
     dataset = dataset.apply(
         tf.data.experimental.shuffle_and_repeat(shuffle_buffer_size))
   else:
     dataset = dataset.repeat()
   dataset = (dataset.map(_preprocess_dataset_record_fn(flags.FLAGS.image_size),
-                         num_parallel_calls=16)
+                         num_parallel_calls=flags.FLAGS.tfdf_num_parallel_calls)
              .batch(batch_size, drop_remainder=True))
   dataset = dataset.prefetch(tf.data.experimental.AUTOTUNE)
   return dataset

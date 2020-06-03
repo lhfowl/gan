@@ -57,7 +57,7 @@ def snconv2d(input_, output_dim, k_h=3, k_w=3, d_h=2, d_w=2, training=True,
         name=name)
 
 
-def snlinear(x, output_size, bias_start=0.0, training=True, name='snlinear'):
+def snlinear(x, output_size, bias_start=0.0, training=True, name='snlinear', use_bias=True):
   """Creates a linear layer with Spectral Normalization applied.
 
   Args:
@@ -76,9 +76,31 @@ def snlinear(x, output_size, bias_start=0.0, training=True, name='snlinear'):
         x,
         output_size,
         activation=None,
-        use_bias=True,
+        use_bias=use_bias,
         kernel_initializer=tf.compat.v1.keras.initializers.VarianceScaling(
             scale=1.0, mode='fan_avg', distribution='uniform'),
+        bias_initializer=tf.compat.v1.initializers.constant(bias_start))
+        
+def linear(x, output_size, stddev=0.02, bias_start=0.0, use_bias=True, name='linear'):
+  """Creates a linear layer
+  N02 initialization for biggan
+
+  Args:
+    x: 2D input tensor (batch size, features).
+    output_size: Integer number of features in output of layer.
+    bias_start: Float to which bias parameters are initialized.
+    training: If `True`, add the spectral norm assign ops.
+    name: Optional, variable scope to put the layer's parameters into.
+  Returns:
+    The normalized output tensor of the linear layer.
+  """
+  with tf.compat.v1.variable_scope(name):
+    return tf.compat.v1.layers.dense(
+        x,
+        output_size,
+        activation=None,
+        use_bias=use_bias,
+        kernel_initializer=tf.compat.v1.random_normal_initializer(stddev=stddev),
         bias_initializer=tf.compat.v1.initializers.constant(bias_start))
 
 

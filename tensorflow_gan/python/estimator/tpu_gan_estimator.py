@@ -101,7 +101,7 @@ class TPUGANEstimator(tf.compat.v1.estimator.tpu.TPUEstimator):
       get_eval_metric_ops_fn=None,
       add_summaries=None,
       joint_train=False,
-      gan_train_steps=tfgan_tuples.GANTrainSteps(1, flags.FLAGS.tpu_gan_estimator_d_step),
+      gan_train_steps=tfgan_tuples.GANTrainSteps(flags.FLAGS.tpu_gan_estimator_g_step, flags.FLAGS.tpu_gan_estimator_d_step),
       # TPUEstimator options.
       model_dir=None,
       config=None,
@@ -695,7 +695,8 @@ def _make_custom_metric_tensors(gan_model):
       'generated_data': gan_model.generated_data,
       'real_data': gan_model.real_data,
       'discriminator_real_outputs': gan_model.discriminator_real_outputs,
-      'discriminator_gen_outputs': gan_model.discriminator_gen_outputs,
+      'discriminator_real_classifier_outputs': gan_model.discriminator_real_classification_logits,
+      'discriminator_gen_classifier_outputs': gan_model.discriminator_gen_classification_logits,
   }
 
 

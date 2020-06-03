@@ -528,13 +528,6 @@ def achingegan_generator_loss(
     
     target = tf.reduce_sum(discriminator_gen_classification_logits * one_hot_labels, axis=1, keepdims=True)
     hinged = tf.reduce_max((margin + discriminator_gen_classification_logits - target) * (1-one_hot_labels), axis=1)
-        
-    # target = tf.boolean_mask(discriminator_gen_classification_logits, tf.cast(one_hot_labels, dtype=tf.bool))
-    # wrongs = tf.boolean_mask(discriminator_gen_classification_logits, tf.cast(1-one_hot_labels, dtype=tf.bool))
-    # wrongs = tf.reshape(wrongs, (-1, k-1))
-    # max_wrong = tf.reduce_max(wrongs, axis=1)
-    
-    # hinged = tf.nn.relu(1 + max_wrong - target)
 
     # Average.
     loss = tf.compat.v1.losses.compute_weighted_loss(
