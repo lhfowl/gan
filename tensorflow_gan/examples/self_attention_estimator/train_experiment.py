@@ -21,6 +21,7 @@ from __future__ import division
 from __future__ import print_function
 
 import collections
+import functools
 import time
 
 import tensorflow as tf  # tf
@@ -87,7 +88,7 @@ def _verify_dataset_shape(ds, z_dim):
   ds_shape[1]['labels'].assert_is_compatible_with(lbl_shape)
 
 
-def train_eval_input_fn(mode, params):
+def train_eval_input_fn(mode, params, restrict_classes=None):
   """Mode-aware input function."""
   is_train = mode == tf.estimator.ModeKeys.TRAIN
   split = 'train' if is_train else flags.FLAGS.dataset_val_split_name
@@ -126,7 +127,8 @@ def train_eval_input_fn(mode, params):
   images_ds = data_provider.provide_dataset(
       bs,
       shuffle_buffer_size=params['shuffle_buffer_size'],
-      split=split)
+      split=split,
+      restrict_classes=restrict_classes)
   
   if flags.FLAGS.unlabelled_dataset_name is not None:
     unl_images_ds = data_provider_unlabelled.provide_dataset(
@@ -140,7 +142,10 @@ def train_eval_input_fn(mode, params):
     images_ds = images_ds.map(lambda img, lbl: {'images': img, 'labels': lbl})  # map to dict.
     
   ds = tf.data.Dataset.zip((noise_ds, images_ds))
-  _verify_dataset_shape(ds, params['z_dim'])
+  if restrict_classes is not None:
+    ds = ds.map(lambda noise_ds, images_ds: ({'z': noise_ds, 'labels': images_ds['labels']}, images_ds) )
+  else:
+    _verify_dataset_shape(ds, params['z_dim'])
   return ds
 
 
@@ -173,6 +178,34 @@ def run_train(hparams):
   tf.compat.v1.logging.info('Finished training %i steps.' %
                             hparams.max_number_of_steps)
 
+
+def run_intra_fid_eval(hparams):
+  """..."""
+  tf.compat.v1.logging.info('Intra FID evaluation.')
+  
+  # modified body of make_estimator(hparams)
+  generator = _get_generator_to_be_conditioned(hparams)
+  discriminator = _get_discriminator(hparams)
+
+  if hparams.tpu_params.use_tpu_estimator:
+    config = est_lib.get_tpu_run_config_from_hparams(hparams)
+    estimator = est_lib.get_tpu_estimator(generator, discriminator, hparams, config)
+  else:
+    config = est_lib.get_run_config_from_hparams(hparams)
+    estimator = est_lib.get_gpu_estimator(generator, discriminator, hparams, config)
+  
+  
+  ckpt_str =  evaluation.latest_checkpoint(hparams.model_dir)
+  tf.compat.v1.logging.info('Evaluating checkpoint: %s' % ckpt_str)
+  for class_i in range(flags.FLAGS.num_classes):
+    one_class_train_eval_input_fn = functools.partial(train_eval_input_fn, restrict_classes=[class_i])
+    eval_results = estimator.evaluate(
+        one_class_train_eval_input_fn,
+        steps=hparams.num_eval_steps,
+        name='eval_intra_fid')
+    tf.compat.v1.logging.info('Finished intra fid %i/%i evaluation checkpoint: %s. FID: %.2f, IS gen: %.2f, IS real: %.2f' % \
+    (class_i, flags.FLAGS.num_classes, ckpt_str,
+    eval_results['eval/fid'], eval_results['eval/incscore'], eval_results['eval/real_incscore']) )
 
 def run_continuous_eval(hparams):
   """What to run in continuous eval mode."""
@@ -240,6 +273,41 @@ def _log_performance_statistics(cur_step, steps_taken, time_taken, start_time):
       'Current step: %i, %.4f steps / sec, time since start: %.1f min' % (
           cur_step, steps_per_sec, min_since_start))
 
+def _get_generator_to_be_conditioned(hparams):
+  """Returns a TF-GAN compatible generator function."""
+  def generator(noise_and_lbls, mode):
+    """TF-GAN compatible generator function."""
+    noise, labs = noise_and_lbls['z'], noise_and_lbls['labels']
+    batch_size = tf.shape(input=noise)[0]
+    is_train = (mode == tf.estimator.ModeKeys.TRAIN)
+
+    labs.shape.assert_is_compatible_with([None])
+
+    if hparams.debug_params.fake_nets:
+      gen_imgs = tf.zeros([batch_size, flags.FLAGS.image_size, flags.FLAGS.image_size, 3
+                          ]) * tf.compat.v1.get_variable(
+                              'dummy_g', initializer=2.0)
+      generator_vars = ()
+    else:
+      gen_imgs, generator_vars = gen_module.generator(
+          noise,
+          labs,
+          hparams.gf_dim,
+          hparams.num_classes,
+          training=is_train)
+    # Print debug statistics and log the generated variables.
+    gen_imgs, gen_sparse_class = eval_lib.print_debug_statistics(
+        gen_imgs, labs, 'generator',
+        hparams.tpu_params.use_tpu_estimator)
+    eval_lib.log_and_summarize_variables(generator_vars, 'gvars',
+                                         hparams.tpu_params.use_tpu_estimator)
+    gen_imgs.shape.assert_is_compatible_with([None, flags.FLAGS.image_size, flags.FLAGS.image_size, 3])
+
+    if mode == tf.estimator.ModeKeys.PREDICT:
+      return gen_imgs
+    else:
+      return {'images': gen_imgs, 'labels': labs}
+  return generator
 
 def _get_generator(hparams):
   """Returns a TF-GAN compatible generator function."""

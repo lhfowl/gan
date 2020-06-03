@@ -47,7 +47,7 @@ def get_activations(get_images_fn, num_batches, get_logits=False):
   # Image resizing happens inside the Inception SavedModel.
   outputs = tfgan.eval.sample_and_run_inception(
       sample_fn=lambda _: get_images_fn(),
-      sample_inputs=[1.0] * num_batches)  # dummy inputs
+      sample_inputs=[1.0] * num_batches)  # dummy inputs to sample_fn
   if get_logits:
     return outputs['logits'], outputs['pool_3']
   else:

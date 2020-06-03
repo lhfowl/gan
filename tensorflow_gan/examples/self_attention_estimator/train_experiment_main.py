@@ -53,7 +53,7 @@ flags.DEFINE_float('beta1', 0.0, 'Momentum term of adam. [0.0]')
 
 # ML Infra.
 flags.DEFINE_enum(
-    'mode', None, ['train', 'continuous_eval', 'train_and_eval'],
+    'mode', None, ['train', 'continuous_eval', 'train_and_eval', 'intra_fid_eval'],
     'Mode to run in. `train` just trains the model. `continuous_eval` '
     'continuously looks for new checkpoints and computes eval metrics and '
     'writes sample outputs to disk. `train_and_eval` does both. '
@@ -133,7 +133,8 @@ flags.DEFINE_integer(
     'tpu_gan_estimator_d_step', 1,
     '...')
 flags.DEFINE_float('generator_margin_size', 1.0, 'Used in achingegan_generator_loss.')
-
+flags.DEFINE_integer( 'intra_fid_eval_start', 0, '...')
+flags.DEFINE_integer( 'intra_fid_eval_end', None, '...')
 
 FLAGS = flags.FLAGS
 
@@ -178,6 +179,8 @@ def main(_):
     train_experiment.run_train(hparams)
   elif FLAGS.mode == 'continuous_eval':
     train_experiment.run_continuous_eval(hparams)
+  elif FLAGS.mode == 'intra_fid_eval':
+    train_experiment.run_intra_fid_eval(hparams)
   elif FLAGS.mode == 'train_and_eval' or FLAGS.mode is None:
     train_experiment.run_train_and_eval(hparams)
   else:

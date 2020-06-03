@@ -30,6 +30,8 @@ from tensorflow_gan.python.losses import tuple_losses
 
 from absl import flags
 
+import pdb
+
 def get_tpu_run_config_from_hparams(hparams):
   """Create a TPU-suitable RunConfig from HParams."""
   tf.compat.v1.logging.info('tpu_location: %s', hparams.tpu_params.tpu_location)
