@@ -1,5 +1,5 @@
 
-export EXPERIMENT_NAME=imagenet128_baseline
+export EXPERIMENT_NAME=imagenet128_baseline_ctd_bkp
 export BATCH_SIZE=1024
 export TRAIN_STEPS_PER_EVAL=10000
 export DATASET_ARGS='--image_size=128 \
