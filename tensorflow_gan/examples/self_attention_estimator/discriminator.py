@@ -409,11 +409,10 @@ def discriminator_64_multiproj(image, labels, df_dim, number_classes, act=tf.nn.
     h5_act = act(h5)
     h6 = tf.reduce_sum(input_tensor=h5_act, axis=[1, 2])
     output = ops.snlinear(h6, 1, name='d_sn_linear')
-    h_labels = ops.sn_embedding(labels, number_classes, df_dim * 16,
-                                name='d_embedding')
-    pdb.set_trace()
-    classification_output = ops.snlinear(h6, flags.FLAGS.num_classes, name='d_sn_linear_class')
-    # output += tf.reduce_sum(input_tensor=h6 * h_labels, axis=1, keepdims=True)
+    h_labels = ops.sn_embedding(labels, number_classes, df_dim * 8, name='d_embedding')
+    all_labels = ops.sn_embedding(tf.range(0,flags.FLAGS.num_classes), number_classes, df_dim * 8, name='d_embedding')
+    classification_output = tf.matmul(a=h6, b=all_labels, transpose_b=True)
+    output += tf.reduce_sum(input_tensor=h6 * h_labels, axis=1, keepdims=True)
     
   var_list = tf.compat.v1.get_collection(
       tf.compat.v1.GraphKeys.TRAINABLE_VARIABLES, dis_scope.name)

@@ -1,5 +1,5 @@
 
-export EXPERIMENT_NAME=imagenet64_fixed
+export EXPERIMENT_NAME=imagenet64_multiproj
 export BATCH_SIZE=1024
 export TRAIN_STEPS_PER_EVAL=10000
 export DATASET_ARGS='--image_size=64 \
