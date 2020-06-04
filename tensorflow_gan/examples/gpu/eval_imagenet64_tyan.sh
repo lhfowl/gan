@@ -9,6 +9,7 @@ export DATASET_ARGS='--image_size=64 --dataset_name=imagenet_resized/64x64 --num
 export ADDITIONAL="--critic_type=acgan \
 --num_eval_steps=8 \
 --mode=intra_fid_eval \
+--tfdf_num_parallel_calls=2 \
 --intra_fid_eval_start=${INTRA_FID_EVAL_START} \
 --intra_fid_eval_end=${INTRA_FID_EVAL_END}"
 

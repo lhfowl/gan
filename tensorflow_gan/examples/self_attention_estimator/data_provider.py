@@ -59,7 +59,7 @@ def provide_dataset(batch_size, shuffle_buffer_size, split='train', restrict_cla
   else:
     dataset = dataset.repeat()
   dataset = (dataset.map(_preprocess_dataset_record_fn(flags.FLAGS.image_size),
-                         num_parallel_calls=16)
+                         num_parallel_calls=flags.FLAGS.tfdf_num_parallel_calls)
              .batch(batch_size, drop_remainder=True))
   dataset = dataset.prefetch(tf.data.experimental.AUTOTUNE)
   return dataset

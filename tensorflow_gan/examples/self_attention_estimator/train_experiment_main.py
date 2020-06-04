@@ -135,6 +135,8 @@ flags.DEFINE_integer(
 flags.DEFINE_float('generator_margin_size', 1.0, 'Used in achingegan_generator_loss.')
 flags.DEFINE_integer( 'intra_fid_eval_start', 0, '...')
 flags.DEFINE_integer( 'intra_fid_eval_end', None, '...')
+flags.DEFINE_integer( 'tfdf_num_parallel_calls', 16, '...')
+
 
 FLAGS = flags.FLAGS
 
