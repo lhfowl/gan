@@ -28,6 +28,9 @@ from __future__ import print_function
 from absl import app
 from absl import flags
 
+import logging
+import os
+
 flags.DEFINE_string('model_dir', '/tmp/tfgan_logdir/sagan-estimator',
                     'Optional location to save model. If `None`, use a '
                     'default provided by tf.Estimator.')
@@ -144,6 +147,19 @@ FLAGS = flags.FLAGS
 
 def main(_):
   from tensorflow_gan.examples.self_attention_estimator import train_experiment
+  
+  # get TF logger
+  log = logging.getLogger('tensorflow')
+  log.setLevel(logging.INFO)
+  
+  # create formatter and add it to the handlers
+  formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+  
+  # create file handler
+  fh = logging.FileHandler(os.path.join(FLAGS.model_dir, 'tensorflow.log'))
+  fh.setLevel(logging.INFO)
+  fh.setFormatter(formatter)
+  log.addHandler(fh)
     
   tpu_location = FLAGS.tpu
   hparams = train_experiment.HParams(

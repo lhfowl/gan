@@ -1,3 +1,8 @@
+# Usage:
+# CUDA_VISIBLE_DEVICES=1 INTRA_FID_EVAL_START=125 INTRA_FID_EVAL_END=250 sh gpu/eval_imagenet64_tyan.sh
+# CUDA_VISIBLE_DEVICES=2 INTRA_FID_EVAL_START=250 INTRA_FID_EVAL_END=375 sh gpu/eval_imagenet64_tyan.sh
+# CUDA_VISIBLE_DEVICES=3 INTRA_FID_EVAL_START=375 INTRA_FID_EVAL_END=500 sh gpu/eval_imagenet64_tyan.sh
+
 # export EXPERIMENT_NAME='imagenet64_baseline'
 export EXPERIMENT_NAME='imagenet64_fixed'
 export OUTPUT_DIR=/nfs/cluster/ilya/tfgan/${EXPERIMENT_NAME}
