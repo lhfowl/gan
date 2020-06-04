@@ -1,7 +1,7 @@
 export EXPERIMENT_NAME='imagenet64_baseline'
 # export EXPERIMENT_NAME='imagenet64_fixed'
-export OUTPUT_DIR=/nfs/cluster/ilya/tfdf/${EXPERIMENT_NAME}
-export DATA_DIR=/nfs/cluster/ilya/tfgan
+export OUTPUT_DIR=/nfs/cluster/ilya/tfgan/${EXPERIMENT_NAME}
+export DATA_DIR=/nfs/cluster/ilya/tfdf
 
 export BATCH_SIZE=128
 export DATASET_ARGS='--image_size=64 --dataset_name=imagenet_resized/64x64 --num_classes=1000 --dataset_val_split_name=validation'
