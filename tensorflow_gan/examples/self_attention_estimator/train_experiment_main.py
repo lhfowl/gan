@@ -142,7 +142,7 @@ flags.DEFINE_integer( 'tfdf_num_parallel_calls', 16, '...')
 
 FLAGS = flags.FLAGS
 
-
+import pdb
 
 def main(_):
   from tensorflow_gan.examples.self_attention_estimator import train_experiment
