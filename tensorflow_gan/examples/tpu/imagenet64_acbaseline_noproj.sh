@@ -1,5 +1,5 @@
 
-export EXPERIMENT_NAME=imagenet64_acbaseline_noproj_4step
+export EXPERIMENT_NAME=imagenet64_acbaseline_noproj_5step
 export BATCH_SIZE=1024
 export TRAIN_STEPS_PER_EVAL=10000
 export DATASET_ARGS='--image_size=64 \
@@ -9,7 +9,7 @@ export DATASET_ARGS='--image_size=64 \
 export ADDITIONAL='--critic_type=acgan_noproj \
 --aux_cond_generator_weight=0.1 \
 --aux_cond_discriminator_weight=1.0 \
---tpu_gan_estimator_d_step=4'
+--tpu_gan_estimator_d_step=5'
 
 # export EXPERIMENT_NAME=imagenet64_achinge0.1_noproj_marg1.0
 # export BATCH_SIZE=1024
