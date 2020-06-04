@@ -155,6 +155,7 @@ def main(_):
   formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
   
   # create file handler
+  pdb.set_trace()
   fh = logging.FileHandler(FLAGS.model_dir + '/tensorflow.log')
   fh.setLevel(logging.INFO)
   fh.setFormatter(formatter)
