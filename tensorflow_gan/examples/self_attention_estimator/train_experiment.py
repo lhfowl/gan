@@ -197,7 +197,9 @@ def run_intra_fid_eval(hparams):
   
   ckpt_str =  evaluation.latest_checkpoint(hparams.model_dir)
   tf.compat.v1.logging.info('Evaluating checkpoint: %s' % ckpt_str)
-  for class_i in range(flags.FLAGS.num_classes):
+  start = flags.FLAGS.intra_fid_eval_start
+  end = flags.FLAGS.intra_fid_eval_end if flags.FLAGS.intra_fid_eval_end is not None else flags.FLAGS.num_classes
+  for class_i in range(start, end):
     one_class_train_eval_input_fn = functools.partial(train_eval_input_fn, restrict_classes=[class_i])
     eval_results = estimator.evaluate(
         one_class_train_eval_input_fn,
