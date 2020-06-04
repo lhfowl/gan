@@ -48,6 +48,9 @@ def provide_dataset(batch_size, shuffle_buffer_size, split='train', restrict_cla
     A dataset of num_batches batches of size batch_size of images and labels.
   """
   shuffle = (split not in ['test', 'validation'])
+  if restrict_classes is not None: # things for intra-fid
+    shuffle = False
+    split = 'train'
   dataset = _load_dataset(split, flags.FLAGS.dataset_name, flags.FLAGS.data_dir,
                                    shuffle_files=shuffle)
   if restrict_classes is not None:
