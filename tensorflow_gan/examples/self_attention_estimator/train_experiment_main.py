@@ -142,8 +142,6 @@ flags.DEFINE_integer( 'tfdf_num_parallel_calls', 16, '...')
 
 FLAGS = flags.FLAGS
 
-import pdb
-
 def main(_):
   from tensorflow_gan.examples.self_attention_estimator import train_experiment
   
@@ -155,8 +153,8 @@ def main(_):
   formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
   
   # create file handler
-  pdb.set_trace()
-  fh = logging.FileHandler(FLAGS.model_dir + '/tensorflow.log')
+  logging_dir = '~' if FLAGS.use_tpu else FLAGS.model_dir
+  fh = logging.FileHandler(logging_dir + '/tensorflow.log')
   fh.setLevel(logging.INFO)
   fh.setFormatter(formatter)
   log.addHandler(fh)
