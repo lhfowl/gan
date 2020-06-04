@@ -118,7 +118,7 @@ flags.DEFINE_float('aux_mhinge_cond_generator_weight', None,
 flags.DEFINE_float('aux_mhinge_cond_discriminator_weight', None, 
                    '..., default is None.')
 flags.DEFINE_enum(
-    'critic_type', 'acgan', ['acgan', 'kplusone_fm', 'kplusone_wgan', 'acgan_noproj'],
+    'critic_type', 'acgan', ['acgan', 'kplusone_fm', 'kplusone_wgan', 'acgan_noproj', 'acgan_multiproj'],
     '...')
 flags.DEFINE_float('kplusone_mhinge_cond_discriminator_weight', None, 
                    '..., default is None.')
