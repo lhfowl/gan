@@ -29,6 +29,7 @@ from absl import app
 from absl import flags
 
 import logging
+import os
 
 flags.DEFINE_string('model_dir', '/tmp/tfgan_logdir/sagan-estimator',
                     'Optional location to save model. If `None`, use a '
@@ -153,7 +154,7 @@ def main(_):
   formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
   
   # create file handler
-  logging_dir = '~' if FLAGS.use_tpu else FLAGS.model_dir
+  logging_dir = os.environ['HOME'] if FLAGS.use_tpu else FLAGS.model_dir
   fh = logging.FileHandler(logging_dir + '/tensorflow.log')
   fh.setLevel(logging.INFO)
   fh.setFormatter(formatter)
