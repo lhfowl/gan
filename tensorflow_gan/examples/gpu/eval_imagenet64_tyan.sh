@@ -1,5 +1,5 @@
-export EXPERIMENT_NAME='imagenet64_baseline'
-# export EXPERIMENT_NAME='imagenet64_fixed'
+# export EXPERIMENT_NAME='imagenet64_baseline'
+export EXPERIMENT_NAME='imagenet64_fixed'
 export OUTPUT_DIR=/nfs/cluster/ilya/tfgan/${EXPERIMENT_NAME}
 export DATA_DIR=/nfs/cluster/ilya/tfdf
 
