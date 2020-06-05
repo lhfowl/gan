@@ -1,5 +1,5 @@
 
-export EXPERIMENT_NAME=imagenet128_baseline_ctd_bkp
+export EXPERIMENT_NAME=imagenet128_baseline
 export BATCH_SIZE=1024
 export TRAIN_STEPS_PER_EVAL=10000
 export DATASET_ARGS='--image_size=128 \
@@ -8,6 +8,7 @@ export DATASET_ARGS='--image_size=128 \
 --dataset_val_split_name=validation'
 export ADDITIONAL='--critic_type=acgan_multiproj \
 --num_eval_steps=49 \
+--mode=continuous_eval \
 --mode=continuous_eval'
 
 bash tpu/_eval_base.sh
