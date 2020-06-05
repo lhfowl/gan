@@ -140,7 +140,8 @@ flags.DEFINE_integer( 'intra_fid_eval_start', 0, '...')
 flags.DEFINE_integer( 'intra_fid_eval_end', None, '...')
 flags.DEFINE_integer( 'tfdf_num_parallel_calls', 16, '...')
 flags.DEFINE_integer( 'n_images_per_side_to_gen_per_class', None, '...')
-flags.DEFINE_bool('gen_images_with_margins', False, 'Whether to use TPU or CPU.')
+flags.DEFINE_bool('gen_images_with_margins', False, '..')
+flags.DEFINE_bool('extra_eval_metrics', False, '..')
 
 
 

@@ -298,6 +298,23 @@ def classifier_score_streaming(input_tensor, classifier_fn, num_batches=1):
   return _classifier_score_helper(
       input_tensor, classifier_fn, num_batches, streaming=True)
 
+def _accuracy_score_from_logits_helper(logits, labels, streaming=False):
+  logits = tf.convert_to_tensor(value=logits)
+  logits.shape.assert_has_rank(2)
+  
+  preds = tf.argmax(logits, axis=1)
+  if streaming:
+    return eval_utils.streaming_mean_tensor_float64(
+        tf.reduce_mean(tf.cast(tf.equal(preds, labels), tf.float64), axis=0))
+  else:
+    return tf.reduce_mean(tf.cast(tf.equal(preds, labels), tf.float64), axis=0)
+
+def accuracy_score_from_logits_streaming(logits, labels):
+  """
+  TODO(ilyak): Fill in description
+  """
+  return _accuracy_score_from_logits_helper(logits, labels, streaming=True)
+
 
 def _classifier_score_from_logits_helper(logits, streaming=False):
   """A helper function for evaluating the classifier score from logits."""
