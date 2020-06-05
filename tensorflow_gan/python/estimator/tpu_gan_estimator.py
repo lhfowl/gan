@@ -694,8 +694,8 @@ def _make_custom_metric_tensors(gan_model):
       'generator_inputs': gan_model.generator_inputs,
       'generated_data': gan_model.generated_data,
       'real_data': gan_model.real_data,
-      'discriminator_real_outputs': gan_model.discriminator_real_outputs,
-      'discriminator_gen_outputs': gan_model.discriminator_gen_outputs,
+      'discriminator_real_classifier_outputs': gan_model.discriminator_real_classification_logits,
+      'discriminator_gen_classifier_outputs': gan_model.discriminator_gen_classification_logits,
   }
 
 
