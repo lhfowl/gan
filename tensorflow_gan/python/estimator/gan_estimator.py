@@ -244,12 +244,22 @@ def get_gan_model(mode,
                   generator_scope='Generator',
                   discriminator_scope='Discriminator'):
   """Makes the GANModel tuple, which encapsulates the GAN model architecture."""
-  if mode == tf.estimator.ModeKeys.PREDICT:
+  if mode == tf.estimator.ModeKeys.PREDICT and flags.FLAGS.gen_images_with_margins:
+    # need this because we load the discrinimator
+    side = flags.FLAGS.n_images_per_side_to_gen_per_class
+    bs = side*side
+    fake_imgs = tf.zeros([bs, flags.FLAGS.image_size, flags.FLAGS.image_size, 3])
+    fake_lbls = tf.zeros([bs], dtype=tf.int32)
+    real_data = {'images': fake_imgs, 'labels': fake_lbls}
+    gan_model = _make_gan_model(generator_fn, discriminator_fn, real_data,
+                                generator_inputs, generator_scope,
+                                discriminator_scope, add_summaries, mode)
+  elif mode == tf.estimator.ModeKeys.PREDICT:
     if real_data is not None:
       raise ValueError('`labels` must be `None` when mode is `predict`. '
-                       'Instead, found %s' % real_data)
+                      'Instead, found %s' % real_data)
     gan_model = make_prediction_gan_model(generator_inputs, generator_fn,
-                                          generator_scope)
+                                          generator_scope, discriminator_fn)
   else:  # tf.estimator.ModeKeys.TRAIN or tf.estimator.ModeKeys.EVAL
     gan_model = _make_gan_model(generator_fn, discriminator_fn, real_data,
                                 generator_inputs, generator_scope,
@@ -291,6 +301,8 @@ def _make_gan_model(generator_fn, discriminator_fn, real_data, generator_inputs,
   return gan_model
 
 
+
+
 def make_prediction_gan_model(generator_inputs, generator_fn, generator_scope):
   """Make a `GANModel` from just the generator."""
   # If `generator_fn` has an argument `mode`, pass mode to it.
@@ -300,6 +312,7 @@ def make_prediction_gan_model(generator_inputs, generator_fn, generator_scope):
   with tf.compat.v1.variable_scope(generator_scope) as gen_scope:
     generator_inputs = tfgan_train._convert_tensor_or_l_or_d(generator_inputs)  # pylint:disable=protected-access
     generated_data = generator_fn(generator_inputs)
+
   generator_variables = tf.compat.v1.get_collection(
       tf.compat.v1.GraphKeys.GLOBAL_VARIABLES, gen_scope.name)
 
@@ -338,11 +351,29 @@ def get_eval_estimator_spec(gan_model, gan_loss, get_eval_metric_ops_fn=None):
       loss=gan_loss.discriminator_loss,
       eval_metric_ops=eval_metric_ops)
 
-
 def get_predict_estimator_spec(gan_model):
   """Return an EstimatorSpec for the predict case."""
-  return tf.estimator.EstimatorSpec(mode=tf.estimator.ModeKeys.PREDICT,
-                                    predictions=gan_model.generated_data)
+
+  if flags.FLAGS.gen_images_with_margins:
+  
+    class_logits = gan_model.discriminator_gen_classification_logits
+    one_hot_labels = tf.one_hot(gan_model.generator_inputs['labels'], flags.FLAGS.num_classes)
+    target_real = tf.reduce_sum(class_logits * one_hot_labels, axis=1, keepdims=True)
+    margins = tf.reduce_max((class_logits - target_real) * (1 - one_hot_labels), axis=1)
+    
+    images = gan_model.generated_data['images']
+    idxs = tf.argsort(margins)
+    preds= []
+    for i in range(idxs.shape[0]):
+      preds.append(images[idxs[i],:,:,:])
+    preds = tf.stack(preds)
+    
+    
+    return tf.estimator.EstimatorSpec(mode=tf.estimator.ModeKeys.PREDICT,
+        predictions=preds)
+  else:
+    return tf.estimator.EstimatorSpec(mode=tf.estimator.ModeKeys.PREDICT,
+                                      predictions=gan_model.generated_data)
 
 
 def _maybe_construct_optimizers(optimizers):

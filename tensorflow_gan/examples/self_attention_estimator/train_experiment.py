@@ -121,7 +121,7 @@ def train_eval_input_fn(mode, params, restrict_classes=None):
     return noise[0]  # one tower
 
   noise_ds = tf.data.Dataset.from_tensors(0).repeat().map(_make_noise)
-  if mode == tf.estimator.ModeKeys.PREDICT:
+  if mode == tf.estimator.ModeKeys.PREDICT and not flags.FLAGS.mode == 'gen_images':
     return noise_ds
 
   images_ds = data_provider.provide_dataset(
@@ -141,9 +141,19 @@ def train_eval_input_fn(mode, params, restrict_classes=None):
   else:
     images_ds = images_ds.map(lambda img, lbl: {'images': img, 'labels': lbl})  # map to dict.
     
+  
   ds = tf.data.Dataset.zip((noise_ds, images_ds))
   if restrict_classes is not None:
     ds = ds.map(lambda noise_ds, images_ds: ({'z': noise_ds, 'labels': images_ds['labels']}, images_ds) )
+  elif flags.FLAGS.mode == 'gen_images':
+    
+    def _make_labels(y):
+      return gen_module.make_one_batch_constant_labels(bs, y)
+    labs_ds = tf.data.Dataset.from_tensor_slices(list(range(flags.FLAGS.num_classes))).repeat().map(_make_labels)
+    
+    ds = tf.data.Dataset.zip((noise_ds, images_ds, labs_ds))
+    ds = ds.map(lambda noise_ds_, images_ds_, labs_ds_: {'z': noise_ds_, 'labels': labs_ds_} ) # fake data only
+    # ds = ds.map(lambda noise_ds_, images_ds_, labs_ds_: ({'z': noise_ds_, 'labels': labs_ds_}, images_ds_) )
   else:
     _verify_dataset_shape(ds, params['z_dim'])
   return ds
@@ -177,6 +187,31 @@ def run_train(hparams):
   estimator.train(train_eval_input_fn, max_steps=hparams.max_number_of_steps)
   tf.compat.v1.logging.info('Finished training %i steps.' %
                             hparams.max_number_of_steps)
+
+def gen_images(hparams):
+  """..."""
+  tf.compat.v1.logging.info('Intra FID evaluation.')
+  
+  # modified body of make_estimator(hparams)
+  discriminator = _get_discriminator(hparams)
+  generator = _get_generator_to_be_conditioned(hparams)
+
+  if hparams.tpu_params.use_tpu_estimator:
+    config = est_lib.get_tpu_run_config_from_hparams(hparams)
+    estimator = est_lib.get_tpu_estimator(generator, discriminator, hparams, config)
+  else:
+    config = est_lib.get_run_config_from_hparams(hparams)
+    estimator = est_lib.get_gpu_estimator(generator, discriminator, hparams, config)
+  
+  ckpt_str =  evaluation.latest_checkpoint(hparams.model_dir)
+  tf.compat.v1.logging.info('Evaluating checkpoint: %s' % ckpt_str)
+  
+  try:
+    cur_step = int(estimator.get_variable_value('global_step'))
+  except ValueError:
+    cur_step = 0
+  eval_lib.predict_and_write_images(estimator, train_eval_input_fn,
+                                        hparams.model_dir, 'step_%i' % cur_step)
 
 
 def run_intra_fid_eval(hparams):
@@ -283,7 +318,7 @@ def _get_generator_to_be_conditioned(hparams):
     batch_size = tf.shape(input=noise)[0]
     is_train = (mode == tf.estimator.ModeKeys.TRAIN)
 
-    labs.shape.assert_is_compatible_with([None])
+    # labs.shape.assert_is_compatible_with([None]) # not correct for gen_images
 
     if hparams.debug_params.fake_nets:
       gen_imgs = tf.zeros([batch_size, flags.FLAGS.image_size, flags.FLAGS.image_size, 3
@@ -305,7 +340,7 @@ def _get_generator_to_be_conditioned(hparams):
                                          hparams.tpu_params.use_tpu_estimator)
     gen_imgs.shape.assert_is_compatible_with([None, flags.FLAGS.image_size, flags.FLAGS.image_size, 3])
 
-    if mode == tf.estimator.ModeKeys.PREDICT:
+    if mode == tf.estimator.ModeKeys.PREDICT and not flags.FLAGS.gen_images_with_margins:
       return gen_imgs
     else:
       return {'images': gen_imgs, 'labels': labs}

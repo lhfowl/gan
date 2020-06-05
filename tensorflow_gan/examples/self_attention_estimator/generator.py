@@ -36,6 +36,11 @@ def make_z_normal(num_batches, batch_size, z_dim):
   z = tf.random.normal(shape, name='z0', dtype=tf.float32)
   return z
 
+def make_one_batch_constant_labels(batch_size, y):
+  """Generate class labels for generation."""
+  gen_class_logits = y*tf.ones((batch_size,), dtype=tf.int32)
+
+  return gen_class_logits
 
 def make_class_labels(batch_size, num_classes):
   """Generate class labels for generation."""
