@@ -88,8 +88,12 @@ def _verify_dataset_shape(ds, z_dim):
   ds_shape[1]['labels'].assert_is_compatible_with(lbl_shape)
 
 
-def train_eval_input_fn(mode, params, restrict_classes=None):
-  """Mode-aware input function."""
+def train_eval_input_fn(mode, params, restrict_classes=None, shift_classes=0):
+  """Mode-aware input function.
+  
+  restrict_classes: for use with intra fid
+  shift_classes: for use with restrict_classes
+  """
   is_train = mode == tf.estimator.ModeKeys.TRAIN
   split = 'train' if is_train else flags.FLAGS.dataset_val_split_name
 
@@ -144,7 +148,7 @@ def train_eval_input_fn(mode, params, restrict_classes=None):
   
   ds = tf.data.Dataset.zip((noise_ds, images_ds))
   if restrict_classes is not None or flags.FLAGS.mode == 'intra_fid_eval':
-    ds = ds.map(lambda noise_ds, images_ds: ({'z': noise_ds, 'labels': images_ds['labels']}, images_ds) )
+    ds = ds.map(lambda noise_ds, images_ds: ({'z': noise_ds, 'labels': images_ds['labels']-shift_classes}, {'images': images_ds['images'], 'labels': images_ds['labels']-shift_classes}) )
   elif flags.FLAGS.mode == 'gen_images':
     
     def _make_labels(y):
@@ -236,7 +240,7 @@ def run_intra_fid_eval(hparams):
   n_chunks = flags.FLAGS.num_classes // chunk_sz
   for chunk_i in range(0, n_chunks):
     restrict_classes = list(range(chunk_i*chunk_sz, (chunk_i+1)*chunk_sz ))
-    limited_class_train_eval_input_fn = functools.partial(train_eval_input_fn, restrict_classes=restrict_classes)
+    limited_class_train_eval_input_fn = functools.partial(train_eval_input_fn, restrict_classes=restrict_classes, shift_classes=chunk_i*chunk_sz)
     eval_results = estimator.evaluate(
         limited_class_train_eval_input_fn,
         steps=hparams.num_eval_steps,
