@@ -241,7 +241,7 @@ def run_intra_fid_eval(hparams):
         limited_class_train_eval_input_fn,
         steps=hparams.num_eval_steps,
         name='eval_intra_fid')
-    tf.compat.v1.logging.info('Finished intra fid {}/{} evaluation checkpoint: {}. FID: {}'.format(chunk_i, n_chunks, ckpt_str, eval_results['eval/fid']) )
+    tf.compat.v1.logging.info('Finished intra fid {}/{} evaluation checkpoint: {}. IFID: {}'.format(chunk_i, n_chunks, ckpt_str, eval_results['eval/intra_fid']) )
 
 def run_continuous_eval(hparams):
   """What to run in continuous eval mode."""
