@@ -4,7 +4,7 @@ export OUTPUT_DIR=/scratch0/ilya/locDoc/tfgan/${EXPERIMENT_NAME}
 export DATA_DIR=/scratch1/ilya/locDoc/data/tfdf
 
 export BATCH_SIZE=128
-export DATASET_ARGS='--image_size=64 --dataset_name=imagenet_resized/64x64 --num_classes=1000 --dataset_val_split_name=validation'
+export DATASET_ARGS='--image_size=64 --dataset_name=imagenet_resized/64x64 --num_classes=1000 --dataset_val_split_name=train'
 
 # export ADDITIONAL='--critic_type=acgan \
 # --num_eval_steps=40 \

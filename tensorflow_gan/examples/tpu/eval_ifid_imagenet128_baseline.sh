@@ -7,7 +7,7 @@ export DATASET_ARGS='--image_size=128 \
 --num_classes=1000 \
 --dataset_val_split_name=train'
 export ADDITIONAL="--critic_type=acgan \
---num_eval_steps=100 \
+--num_eval_steps=40 \
 --mode=intra_fid_eval \
 --intra_fid_eval_chunk_size=20"
 
