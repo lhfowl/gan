@@ -182,6 +182,20 @@ def _symmetric_matrix_square_root(mat, eps=1e-10):
   # (when referencing the equation A = U S V^T)
   # This is unlike Numpy which returns v = V^T
   return tf.matmul(tf.matmul(u, tf.linalg.tensor_diag(si)), v, transpose_b=True)
+  
+  
+def _batch_symmetric_matrix_square_root(mat, eps=1e-10):
+  """...
+  """
+  # Unlike numpy, tensorflow's return order is (s, u, v)
+  s, u, v = tf.linalg.svd(mat)
+  # sqrt is unstable around 0, just use 0 in such case
+  si = tf.compat.v1.where(tf.less(s, eps), s, tf.sqrt(s))
+  # Note that the v returned by Tensorflow is v = V
+  # (when referencing the equation A = U S V^T)
+  # This is unlike Numpy which returns v = V^T
+  
+  return tf.matmul(u * tf.expand_dims(si, 1), v, transpose_b=True)
 
 
 def kl_divergence(p, p_logits, q):
@@ -413,6 +427,18 @@ def classifier_score_from_logits_streaming(logits):
   """
   return _classifier_score_from_logits_helper(logits, streaming=True)
 
+
+def batch_trace_sqrt_product(sigma, sigma_v):
+  """...
+  """
+
+  # Note sqrt_sigma is called "A" in the proof above
+  sqrt_sigma = _batch_symmetric_matrix_square_root(sigma)
+
+  # This is sqrt(A sigma_v A) above
+  sqrt_a_sigmav_a = tf.matmul(sqrt_sigma, tf.matmul(sigma_v, sqrt_sigma))
+
+  return tf.linalg.trace(_batch_symmetric_matrix_square_root(sqrt_a_sigmav_a))
 
 def trace_sqrt_product(sigma, sigma_v):
   """Find the trace of the positive sqrt of product of covariance matrices.
@@ -702,6 +728,54 @@ def diagonal_only_frechet_classifier_distance_from_activations(
 
   return dofid
 
+import pdb
+def _intra_class_frechet_classifier_distance_from_activations_helper(
+  activations1, activations2, labels1, labels2, nclass, streaming=True):
+  """..."""
+  activations1 = tf.convert_to_tensor(value=activations1)
+  activations1.shape.assert_has_rank(2)
+  activations2 = tf.convert_to_tensor(value=activations2)
+  activations2.shape.assert_has_rank(2)
+
+  activations_dtype = activations1.dtype
+  if activations_dtype != tf.float64:
+    activations1 = tf.cast(activations1, tf.float64)
+    activations2 = tf.cast(activations2, tf.float64)
+  if streaming:
+    # now we keep track of nfeat x nclass
+    m = eval_utils.streaming_classwise_mean_feature_tensor_float64(activations1, labels1, nclass)
+    m_w = eval_utils.streaming_classwise_mean_feature_tensor_float64(activations2, labels2, nclass)
+    
+    sigma = eval_utils.streaming_classwise_autocovariance(activations1, labels1, nclass)
+    sigma_w = eval_utils.streaming_classwise_autocovariance(activations1, labels1, nclass)
+  
+  
+  def _calculate_intra_fid(m, m_w, sigma, sigma_w):
+    """Returns the Frechet distance given the sample mean and covariance."""
+    # Find the Tr(sqrt(sigma sigma_w)) component of FID
+    sqrt_trace_component = batch_trace_sqrt_product(sigma, sigma_w)
+
+    # Compute the two components of FID.
+
+    # First the covariance component.
+    # Here, note that trace(A + B) = trace(A) + trace(B)
+    trace = tf.linalg.trace(sigma + sigma_w) - 2.0 * sqrt_trace_component
+
+    # Next the distance between means.
+    mean = tf.reduce_sum(input_tensor=tf.math.squared_difference( m, m_w), axis=0)  # Equivalent to L2 but more stable.
+    fid = trace + mean
+    if activations_dtype != tf.float64:
+      fid = tf.cast(fid, activations_dtype)
+    return fid
+  
+  result = tuple(
+      _calculate_intra_fid(m_val, m_w_val, sigma_val, sigma_w_val)
+      for m_val, m_w_val, sigma_val, sigma_w_val in zip(m, m_w, sigma, sigma_w))
+  if streaming:
+    # pdb.set_trace()
+    return result
+  else:
+    return result[0]
 
 def _frechet_classifier_distance_from_activations_helper(
     activations1, activations2, streaming=False):
@@ -809,6 +883,10 @@ def frechet_classifier_distance_from_activations(activations1, activations2):
   return _frechet_classifier_distance_from_activations_helper(
       activations1, activations2, streaming=False)
 
+def intra_class_frechet_classifier_distance_from_activations_streaming(
+  activations1, activations2, labels1, labels2, nclass):
+  return _intra_class_frechet_classifier_distance_from_activations_helper(
+    activations1, activations2, labels1, labels2, nclass, streaming=True)
 
 def frechet_classifier_distance_from_activations_streaming(
     activations1, activations2):

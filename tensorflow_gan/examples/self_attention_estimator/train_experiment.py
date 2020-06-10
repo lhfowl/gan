@@ -143,7 +143,7 @@ def train_eval_input_fn(mode, params, restrict_classes=None):
     
   
   ds = tf.data.Dataset.zip((noise_ds, images_ds))
-  if restrict_classes is not None:
+  if restrict_classes is not None or flags.FLAGS.mode == 'intra_fid_eval':
     ds = ds.map(lambda noise_ds, images_ds: ({'z': noise_ds, 'labels': images_ds['labels']}, images_ds) )
   elif flags.FLAGS.mode == 'gen_images':
     
@@ -232,17 +232,16 @@ def run_intra_fid_eval(hparams):
   
   ckpt_str =  evaluation.latest_checkpoint(hparams.model_dir)
   tf.compat.v1.logging.info('Evaluating checkpoint: %s' % ckpt_str)
-  start = flags.FLAGS.intra_fid_eval_start
-  end = flags.FLAGS.intra_fid_eval_end if flags.FLAGS.intra_fid_eval_end is not None else flags.FLAGS.num_classes
-  for class_i in range(start, end):
-    one_class_train_eval_input_fn = functools.partial(train_eval_input_fn, restrict_classes=[class_i])
+  chunk_sz = flags.FLAGS.intra_fid_eval_chunk_size
+  n_chunks = flags.FLAGS.num_classes // chunk_sz
+  for chunk_i in range(0, n_chunks):
+    restrict_classes = list(range(chunk_i*chunk_sz, (chunk_i+1)*chunk_sz ))
+    limited_class_train_eval_input_fn = functools.partial(train_eval_input_fn, restrict_classes=restrict_classes)
     eval_results = estimator.evaluate(
-        one_class_train_eval_input_fn,
+        limited_class_train_eval_input_fn,
         steps=hparams.num_eval_steps,
         name='eval_intra_fid')
-    tf.compat.v1.logging.info('Finished intra fid %i/%i evaluation checkpoint: %s. FID: %.2f, IS gen: %.2f, IS real: %.2f' % \
-    (class_i, flags.FLAGS.num_classes, ckpt_str,
-    eval_results['eval/fid'], eval_results['eval/incscore'], eval_results['eval/real_incscore']) )
+    tf.compat.v1.logging.info('Finished intra fid {}/{} evaluation checkpoint: {}. FID: {}'.format(chunk_i, n_chunks, ckpt_str, eval_results['eval/fid']) )
 
 def run_continuous_eval(hparams):
   """What to run in continuous eval mode."""

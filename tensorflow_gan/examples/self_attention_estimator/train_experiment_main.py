@@ -136,8 +136,7 @@ flags.DEFINE_integer(
     'tpu_gan_estimator_d_step', 1,
     '...')
 flags.DEFINE_float('generator_margin_size', 1.0, 'Used in achingegan_generator_loss.')
-flags.DEFINE_integer( 'intra_fid_eval_start', 0, '...')
-flags.DEFINE_integer( 'intra_fid_eval_end', None, '...')
+flags.DEFINE_integer( 'intra_fid_eval_chunk_size', None, '...')
 flags.DEFINE_integer( 'tfdf_num_parallel_calls', 16, '...')
 flags.DEFINE_integer( 'n_images_per_side_to_gen_per_class', None, '...')
 flags.DEFINE_bool('gen_images_with_margins', False, '..')

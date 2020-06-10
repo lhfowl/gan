@@ -233,6 +233,59 @@ def streaming_mean_tensor_float64(values, updates_collections=None, name=None):
       tf.compat.v1.add_to_collections(updates_collections, update_op)
 
     return mean_t, update_op
+    
+def streaming_classwise_mean_feature_tensor_float64(x, labels, nclass, updates_collections=None, name=None):
+  """A version of tf.metrics.mean_tensor that ...
+
+  Unlike tf.metrics.mean_tensor, current implementation does not support
+  distributed processing and weights.
+
+  Args:
+    x: A `Tensor` of batch size x feature size.
+    labels: vector of integer labels
+    nclass: scalar
+    updates_collections: An optional list of collections that `update_op` should
+      be added to.
+    name: An optional variable_scope name.
+
+  Returns: shape featsize x nclass
+    mean: A float64 `Tensor` representing the current mean, the value of `total`
+      divided by `count`.
+    update_op: An operation that increments the `total` and `count` variables
+      appropriately and whose value matches `mean_value`.
+
+  Raises:
+    ValueError: If `updates_collections` is not a list or tuple.
+    RuntimeError: If eager execution is enabled.
+  """
+  # Code below copied from the implementation of tf.metrics.mean_tensor.
+  if tf.executing_eagerly():
+    raise RuntimeError("streaming_mean_tensor_float64 is not supported when "
+                       "eager execution is enabled.")
+  if x.dtype != tf.float64:
+    x = tf.cast(x, tf.float64)
+
+  feature_shape = x.get_shape()[1:]
+  
+  with tf.compat.v1.variable_scope(name, "streaming_mean_tensor_float64",
+                                   (x,)):
+    one_hot = tf.one_hot(labels, nclass, dtype=tf.float64)
+    total = _get_streaming_variable(
+        name="total_tensor", shape=feature_shape.as_list() + [nclass])
+    count = _get_streaming_variable(
+        name="count_tensor", shape=(1,nclass))
+    
+    update_total_op = tf.compat.v1.assign_add(total, tf.matmul(a=x, b=one_hot, transpose_a=True))
+    with tf.control_dependencies([x]):
+      update_count_op = tf.compat.v1.assign_add(count, tf.reduce_sum(one_hot, axis=0, keepdims=True))
+
+    mean_t = tf.compat.v1.div_no_nan(total, count)
+    update_op = tf.compat.v1.div_no_nan(
+        update_total_op, tf.maximum(update_count_op, 0), name="update_op")
+    if updates_collections:
+      tf.compat.v1.add_to_collections(updates_collections, update_op)
+
+    return mean_t, update_op
 
 
 def streaming_covariance(x, y=None, updates_collections=None, name=None):
@@ -301,6 +354,78 @@ def streaming_covariance(x, y=None, updates_collections=None, name=None):
   with tf.control_dependencies([meanx_update_op, meany_update_op]):
     update_n_op = tf.compat.v1.assign_add(n, num_values)
 
+  result = tf.compat.v1.div_no_nan(cov_matrix, n - 1.)
+  update_op = tf.compat.v1.div_no_nan(
+      cov_matrix_update_op, update_n_op - 1., name="covariance_update_op")
+  if updates_collections:
+    tf.compat.v1.add_to_collections(updates_collections, update_op)
+
+  return result, update_op
+
+def streaming_classwise_autocovariance(x, labels, nclass, updates_collections=None, name=None):
+  """Similar to streaming_covariance but with multiple classes for intra fid.
+  
+  Function format copies streaming_covariance exactly. Yes, y is superfluous.
+  Taking it away led to incorrect state of streaming variables.
+
+  Args:
+    x: A 2D numeric `Tensor` holding samples.
+
+  Returns:
+    covariance: A float64 `Tensor` holding the sample covariance matrix.
+    update_op: An operation that updates the internal variables appropriately
+      and whose value matches `covariance`.
+
+  Raises:
+    ValueError: If `updates_collections` is not a list or tuple.
+    RuntimeError: If eager execution is enabled.
+  """
+  
+  if tf.executing_eagerly():
+    raise RuntimeError("streaming_covariance is not supported when "
+                       "eager execution is enabled.")
+  if x.dtype != tf.float64:
+    x = tf.cast(x, tf.float64)
+  
+  x.shape.assert_has_rank(2)
+  feature_shape = x.get_shape()[1:]
+
+  with tf.compat.v1.variable_scope(name, "streaming_covariance", [x]):
+    n = _get_streaming_variable(name="n", shape=[nclass, 1, 1])
+    meany = _get_streaming_variable(name="meany", shape=[nclass] + feature_shape.as_list() + [1])
+    meanx = _get_streaming_variable(name="meanx", shape=[nclass] + feature_shape.as_list() + [1])
+
+    cov_matrix = _get_streaming_variable(
+        name="cov_matrix",
+        shape=[nclass] + feature_shape.as_list() + feature_shape.as_list())
+
+  labels_one_hot = tf.transpose(tf.one_hot(labels, nclass, dtype=tf.float64)) # nclass, eg
+  labels_one_hot_ = tf.expand_dims(labels_one_hot, axis=1)
+  num_values_per_class = tf.expand_dims(tf.reduce_sum(labels_one_hot, axis=1, keepdims=True), -1)
+  
+  x = tf.tile(tf.expand_dims(tf.transpose(x), axis=0), [nclass, 1, 1])
+  y = x
+  
+  dx = tf.reduce_sum(input_tensor=
+    ((x*labels_one_hot_) / tf.maximum(num_values_per_class,1) ), axis=2, keepdims=True) - meanx
+  dy = tf.reduce_sum(input_tensor=
+    ((y*labels_one_hot_) / tf.maximum(num_values_per_class,1) ), axis=2, keepdims=True) - meany
+  
+  meany_update_op = tf.compat.v1.assign_add(meany, 
+    (num_values_per_class / tf.maximum(n + num_values_per_class, 1)) * dy)
+  
+  with tf.control_dependencies([meany_update_op]):
+    cov_matrix_update_op = tf.compat.v1.assign_add(
+        cov_matrix,
+        tf.matmul(a=((x - meanx)*labels_one_hot_), b=((y - meany_update_op)*labels_one_hot_), transpose_b=True))
+  
+  with tf.control_dependencies([cov_matrix_update_op]):
+    meanx_update_op = tf.compat.v1.assign_add(meanx, 
+    (num_values_per_class / tf.maximum(n + num_values_per_class, 1)) * dx)
+  
+  with tf.control_dependencies([meanx_update_op, meany_update_op]):
+    update_n_op = tf.compat.v1.assign_add(n, num_values_per_class)
+  
   result = tf.compat.v1.div_no_nan(cov_matrix, n - 1.)
   update_op = tf.compat.v1.div_no_nan(
       cov_matrix_update_op, update_n_op - 1., name="covariance_update_op")

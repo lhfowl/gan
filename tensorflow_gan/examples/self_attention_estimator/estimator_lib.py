@@ -232,6 +232,14 @@ def get_metrics(real_logits, real_pools, fake_logits, fake_pools,
     metric_dict['eval/discriminator_val_acc'] = tfgan_eval.accuracy_score_from_logits_streaming(real_disc_logits, real_labels)
     if 'imagenet_resized' in flags.FLAGS.dataset_name: 
       metric_dict['eval/generator_inception_acc'] = tfgan_eval.accuracy_score_from_logits_streaming(fake_logits[:,1:1001], fake_labels)
+  if flags.FLAGS.mode == 'intra_fid_eval':
+    nclass = flags.FLAGS.intra_fid_eval_chunk_size
+    metric_dict = {
+      'eval/intra_fid':
+          tfgan_eval.intra_class_frechet_classifier_distance_from_activations_streaming(
+            real_pools, fake_pools, real_labels, fake_labels, nclass)
+    }
+    
 
   return metric_dict
 
