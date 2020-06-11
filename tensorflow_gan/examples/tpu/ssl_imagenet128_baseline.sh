@@ -3,8 +3,8 @@
 # export ADDITIONAL='--critic_type=kplusone_fm --kplusone_mhinge_cond_discriminator_weight=1.0 --aux_mhinge_cond_generator_weight=0.05'
 # export ADDITIONAL='--critic_type=kplusone_fm --generator_loss_fn=kplusone_ssl_featurematching_generator_loss --kplusone_mhinge_ssl_cond_discriminator_weight=1.0 --aux_mhinge_cond_generator_weight=0.05'
 
-export EXPERIMENT_NAME=ssl_imagenet128_withproj_baseline_big
-export BATCH_SIZE=2048
+export EXPERIMENT_NAME=ssl_imagenet128_withproj_baseline
+export BATCH_SIZE=1024
 export TRAIN_STEPS_PER_EVAL=10000
 export DATASET_ARGS='--image_size=128 \
 --dataset_name=imagenet2012_subset/10pct \
@@ -24,7 +24,7 @@ export ADDITIONAL='--critic_type=acgan \
 --tpu_gan_estimator_d_step=2 \
 --z_dim=120 \
 --discriminator_lr=0.0005 \
---gf_dim=96 \
---df_dim=96'
+--gf_dim=64 \
+--df_dim=64'
 
 bash tpu/_base.sh
