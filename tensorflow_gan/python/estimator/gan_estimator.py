@@ -259,7 +259,7 @@ def get_gan_model(mode,
       raise ValueError('`labels` must be `None` when mode is `predict`. '
                       'Instead, found %s' % real_data)
     gan_model = make_prediction_gan_model(generator_inputs, generator_fn,
-                                          generator_scope, discriminator_fn)
+                                          generator_scope)
   else:  # tf.estimator.ModeKeys.TRAIN or tf.estimator.ModeKeys.EVAL
     gan_model = _make_gan_model(generator_fn, discriminator_fn, real_data,
                                 generator_inputs, generator_scope,
