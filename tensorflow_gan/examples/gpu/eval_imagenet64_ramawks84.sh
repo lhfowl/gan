@@ -1,5 +1,6 @@
 
-export EXPERIMENT_NAME='imagenet64_fixed'
+# export EXPERIMENT_NAME='imagenet64_fixed'
+export EXPERIMENT_NAME='imagenet64_acbaseline_2step'
 export DATA_DIR=/scratch2/ilyak/locDoc/data/tfdf
 export OUTPUT_DIR=/scratch2/ilyak/locDoc/tfgan/${EXPERIMENT_NAME}
 
