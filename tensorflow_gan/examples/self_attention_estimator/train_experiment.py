@@ -192,9 +192,11 @@ def run_train(hparams):
   tf.compat.v1.logging.info('Finished training %i steps.' %
                             hparams.max_number_of_steps)
 
+import numpy as np
+# import pdb
 def gen_images(hparams):
   """..."""
-  tf.compat.v1.logging.info('Intra FID evaluation.')
+  tf.compat.v1.logging.info('Generating Images.')
   
   # modified body of make_estimator(hparams)
   discriminator = _get_discriminator(hparams)
@@ -210,12 +212,20 @@ def gen_images(hparams):
   ckpt_str =  evaluation.latest_checkpoint(hparams.model_dir)
   tf.compat.v1.logging.info('Evaluating checkpoint: %s' % ckpt_str)
   
-  try:
-    cur_step = int(estimator.get_variable_value('global_step'))
-  except ValueError:
-    cur_step = 0
-  eval_lib.predict_and_write_images(estimator, train_eval_input_fn,
-                                        hparams.model_dir, 'step_%i' % cur_step)
+  # saving matrices
+  embedding_map = estimator.get_variable_value('Discriminator/discriminator/d_embedding/embedding_map')
+  np.save('%s/embedding_map_step_%s.npy' % (hparams.model_dir, ckpt_str.split('-')[-1]), embedding_map)
+  class_kernel = 'Discriminator/discriminator/d_sn_linear_class/dense/kernel'
+  if class_kernel in estimator.get_variable_names():
+    classification_map = estimator.get_variable_value(class_kernel)
+    np.save('%s/classification_map_step_%s.npy' % (hparams.model_dir, ckpt_str.split('-')[-1]), classification_map)
+  
+  # try:
+  #   cur_step = int(estimator.get_variable_value('global_step'))
+  # except ValueError:
+  #   cur_step = 0
+  # eval_lib.predict_and_write_images(estimator, train_eval_input_fn,
+  #                                       hparams.model_dir, 'step_%i' % cur_step)
 
 
 def run_intra_fid_eval(hparams):

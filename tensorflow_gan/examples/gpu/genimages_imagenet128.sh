@@ -1,5 +1,6 @@
 
 # export EXPERIMENT_NAME=imagenet128_baseline
+# export EXPERIMENT_NAME=imagenet128_baseline_ctd_bkp
 export EXPERIMENT_NAME=imagenet128_expt_3ctd_bkp795
 
 export OUTPUT_DIR=/scratch0/ilya/locDoc/tfgan/${EXPERIMENT_NAME}

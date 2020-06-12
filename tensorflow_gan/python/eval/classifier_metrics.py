@@ -328,6 +328,21 @@ def accuracy_score_from_logits_streaming(logits, labels):
   TODO(ilyak): Fill in description
   """
   return _accuracy_score_from_logits_helper(logits, labels, streaming=True)
+  
+def _percent_real_streaming_helper(logits, streaming=False):
+  if streaming:
+    return eval_utils.streaming_mean_tensor_float64(
+      tf.reduce_mean(tf.cast(tf.greater(logits, 0), tf.float64)))
+  else:
+    return tf.reduce_mean(tf.cast(tf.greater(logits, 0), tf.float64))
+
+def percent_real_streaming(logits):
+  """
+  When using wasserstein_hinge_discriminator_loss, +1...infinity is real
+  and -infinity...-1 is fake. This function reports what percentage of logits
+  are above 0.
+  """
+  return _percent_real_streaming_helper(logits, streaming=True)
 
 
 def _classifier_score_from_logits_helper(logits, streaming=False):

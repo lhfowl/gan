@@ -110,6 +110,7 @@ def get_gpu_estimator(generator, discriminator, hparams, config):
     metrics_arguments = prepare_metric_arguments(
         gan_model.generator_inputs, gan_model.generated_data,
         gan_model.real_data,
+        gan_model.discriminator_real_outputs,
         gan_model.discriminator_real_classification_logits,
         gan_model.discriminator_gen_classification_logits)
     metrics = get_metrics(hparams=hparams, **metrics_arguments)
@@ -152,6 +153,7 @@ def get_gpu_estimator(generator, discriminator, hparams, config):
 
 
 def prepare_metric_arguments(generator_inputs, generated_data, real_data,
+                             discriminator_real_outputs,
                              discriminator_real_classifier_outputs,
                              discriminator_gen_classifier_outputs):
   """Prepares the arguments needed for get_metrics.
@@ -192,13 +194,15 @@ def prepare_metric_arguments(generator_inputs, generated_data, real_data,
       'fake_pools': fake_pools,
       'real_labels': real_labels,
       'fake_labels': gen_labels,
+      'real_disc_out': discriminator_real_outputs,
       'real_disc_logits': discriminator_real_classifier_outputs,
       'fake_disc_logits': discriminator_gen_classifier_outputs,
   }
 
 
 def get_metrics(real_logits, real_pools, fake_logits, fake_pools,
-                real_labels, fake_labels, real_disc_logits, fake_disc_logits, hparams):
+                real_labels, fake_labels, real_disc_out,
+                real_disc_logits, fake_disc_logits, hparams):
   """Return metrics for SAGAN experiment on TPU, CPU, or GPU.
 
   When training on TPUs, this function should be executed on the CPU.
@@ -230,6 +234,7 @@ def get_metrics(real_logits, real_pools, fake_logits, fake_pools,
   if flags.FLAGS.extra_eval_metrics:
     metric_dict['eval/generator_self_acc'] = tfgan_eval.accuracy_score_from_logits_streaming(fake_disc_logits, fake_labels)
     metric_dict['eval/discriminator_val_acc'] = tfgan_eval.accuracy_score_from_logits_streaming(real_disc_logits, real_labels)
+    metric_dict['eval/val_real'] = tfgan_eval.percent_real_streaming(real_disc_out)
     if 'imagenet_resized' in flags.FLAGS.dataset_name: 
       metric_dict['eval/generator_inception_acc'] = tfgan_eval.accuracy_score_from_logits_streaming(fake_logits[:,1:1001], fake_labels)
   if flags.FLAGS.mode == 'intra_fid_eval':
