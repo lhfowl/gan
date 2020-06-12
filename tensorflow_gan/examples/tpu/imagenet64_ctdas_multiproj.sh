@@ -1,7 +1,7 @@
 
 export EXPERIMENT_NAME=imagenet64_baseline_ctd
 export BATCH_SIZE=1024
-export TRAIN_STEPS_PER_EVAL=5000
+export TRAIN_STEPS_PER_EVAL=2500
 export DATASET_ARGS='--image_size=64 \
 --dataset_name=imagenet_resized/64x64 \
 --num_classes=1000 \
