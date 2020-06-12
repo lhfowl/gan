@@ -214,7 +214,7 @@ def gen_images(hparams):
   tf.compat.v1.logging.info('Evaluating checkpoint: %s' % ckpt_str)
   
   # saving matrices
-  save_dir = os.environ['HOME'] if FLAGS.use_tpu else hparams.model_dir
+  save_dir = os.environ['HOME'] if flags.FLAGS.use_tpu else hparams.model_dir
   embedding_map = estimator.get_variable_value('Discriminator/discriminator/d_embedding/embedding_map')
   np.save('%s/embedding_map_step_%s.npy' % (save_dir, ckpt_str.split('-')[-1]), embedding_map)
   class_kernel = 'Discriminator/discriminator/d_sn_linear_class/dense/kernel'
