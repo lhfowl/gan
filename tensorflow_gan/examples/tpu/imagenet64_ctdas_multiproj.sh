@@ -8,7 +8,8 @@ export DATASET_ARGS='--image_size=64 \
 --dataset_val_split_name=validation'
 export ADDITIONAL='--critic_type=acgan_multiproj \
 --aux_mhinge_cond_generator_weight=0.1 \
---aux_mhinge_cond_discriminator_weight=1.0'
+--aux_mhinge_cond_discriminator_weight=1.0 \
+--extra_eval_metrics'
 
 
 bash tpu/_base.sh
