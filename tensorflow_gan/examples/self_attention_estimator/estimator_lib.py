@@ -50,6 +50,7 @@ def get_tpu_run_config_from_hparams(hparams):
     eval_training_input_configuration = tf.compat.v1.estimator.tpu.InputPipelineConfig.PER_HOST_V1
   return tf.compat.v1.estimator.tpu.RunConfig(
       model_dir=hparams.model_dir,
+      keep_checkpoint_max=flags.FLAGS.keep_checkpoint_max,
       cluster=cluster_resolver,
       save_checkpoints_steps=hparams.train_steps_per_eval,
       tpu_config=tf.compat.v1.estimator.tpu.TPUConfig(
