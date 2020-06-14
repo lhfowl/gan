@@ -61,6 +61,7 @@ def get_run_config_from_hparams(hparams):
   mirrored_strategy = tf.distribute.MirroredStrategy()
   return tf.estimator.RunConfig(
       model_dir=hparams.model_dir,
+      keep_checkpoint_max=flags.FLAGS.keep_checkpoint_max,
       save_checkpoints_steps=hparams.train_steps_per_eval,
       train_distribute=mirrored_strategy)
 

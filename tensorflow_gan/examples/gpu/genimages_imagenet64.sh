@@ -1,6 +1,7 @@
 # export EXPERIMENT_NAME='imagenet64_baseline'
 # export EXPERIMENT_NAME='imagenet64_fixed'
-export EXPERIMENT_NAME=imagenet64_acbaseline_2step
+# export EXPERIMENT_NAME=imagenet64_acbaseline_2step
+export EXPERIMENT_NAME=imagenet64_baseline_ctd
 export OUTPUT_DIR=/scratch0/ilya/locDoc/tfgan/${EXPERIMENT_NAME}
 export DATA_DIR=/scratch1/ilya/locDoc/data/tfdf
 

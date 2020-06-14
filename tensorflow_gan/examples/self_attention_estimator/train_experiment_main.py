@@ -56,7 +56,7 @@ flags.DEFINE_float('beta1', 0.0, 'Momentum term of adam. [0.0]')
 
 # ML Infra.
 flags.DEFINE_enum(
-    'mode', None, ['train', 'continuous_eval', 'train_and_eval', 'intra_fid_eval', 'gen_images'],
+    'mode', None, ['train', 'continuous_eval', 'train_and_eval', 'intra_fid_eval', 'gen_images', 'gen_matrices'],
     'Mode to run in. `train` just trains the model. `continuous_eval` '
     'continuously looks for new checkpoints and computes eval metrics and '
     'writes sample outputs to disk. `train_and_eval` does both. '
@@ -141,6 +141,7 @@ flags.DEFINE_integer( 'tfdf_num_parallel_calls', 16, '...')
 flags.DEFINE_integer( 'n_images_per_side_to_gen_per_class', None, '...')
 flags.DEFINE_bool('gen_images_with_margins', False, '..')
 flags.DEFINE_bool('extra_eval_metrics', False, '..')
+flags.DEFINE_integer( 'keep_checkpoint_max', 5, 'Number of checkpoints to keep')
 
 
 
@@ -205,6 +206,8 @@ def main(_):
     train_experiment.run_train_and_eval(hparams)
   elif FLAGS.mode == 'gen_images':
     train_experiment.gen_images(hparams)
+  elif FLAGS.mode == 'gen_matrices':
+    train_experiment.gen_matrices(hparams)
   else:
     raise ValueError('Mode not recognized: ', FLAGS.mode)
 

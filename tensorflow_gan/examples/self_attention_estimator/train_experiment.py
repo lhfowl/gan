@@ -20,6 +20,9 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
+import numpy as np
+import os
+
 import collections
 import functools
 import time
@@ -192,12 +195,34 @@ def run_train(hparams):
   tf.compat.v1.logging.info('Finished training %i steps.' %
                             hparams.max_number_of_steps)
 
-import numpy as np
-import os
-# import pdb
 def gen_images(hparams):
   """..."""
   tf.compat.v1.logging.info('Generating Images.')
+  
+  # modified body of make_estimator(hparams)
+  discriminator = _get_discriminator(hparams)
+  generator = _get_generator_to_be_conditioned(hparams)
+
+  if hparams.tpu_params.use_tpu_estimator:
+    config = est_lib.get_tpu_run_config_from_hparams(hparams)
+    estimator = est_lib.get_tpu_estimator(generator, discriminator, hparams, config)
+  else:
+    config = est_lib.get_run_config_from_hparams(hparams)
+    estimator = est_lib.get_gpu_estimator(generator, discriminator, hparams, config)
+  
+  ckpt_str =  evaluation.latest_checkpoint(hparams.model_dir)
+  tf.compat.v1.logging.info('Evaluating checkpoint: %s' % ckpt_str)
+
+  try:
+    cur_step = int(estimator.get_variable_value('global_step'))
+  except ValueError:
+    cur_step = 0
+  eval_lib.predict_and_write_images(estimator, train_eval_input_fn,
+                                        hparams.model_dir, 'step_%i' % cur_step)
+                                        
+def gen_matrices(hparams):
+  """..."""
+  tf.compat.v1.logging.info('Generating Matrices.')
   
   # modified body of make_estimator(hparams)
   discriminator = _get_discriminator(hparams)
@@ -222,12 +247,7 @@ def gen_images(hparams):
     classification_map = estimator.get_variable_value(class_kernel)
     np.save('%s/classification_map_step_%s.npy' % (save_dir, ckpt_str.split('-')[-1]), classification_map)
   
-  # try:
-  #   cur_step = int(estimator.get_variable_value('global_step'))
-  # except ValueError:
-  #   cur_step = 0
-  # eval_lib.predict_and_write_images(estimator, train_eval_input_fn,
-  #                                       hparams.model_dir, 'step_%i' % cur_step)
+
 
 
 def run_intra_fid_eval(hparams):
