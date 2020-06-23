@@ -50,7 +50,7 @@ def print_tensorflow_log(scores, score_names):
 
     print(','.join(['step'] + score_names))
     for step in steps:
-        row = [( '{:.2f}'.format(scores[step][name]) if name in scores[step] else '') for name in score_names]
+        row = [( '{:.4f}'.format(scores[step][name]) if name in scores[step] else '') for name in score_names]
         print(','.join(['{:06d}'.format(step)] + row))
 
 if __name__ == '__main__':
