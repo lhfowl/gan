@@ -11,7 +11,7 @@ import fileinput
 import numpy as np
 from tensorboard.backend.event_processing.event_accumulator import EventAccumulator
 
-def get_tensorflow_log(path, scores={}, event_tags={}):
+def get_tensorflow_log(path, scores={}, score_names=[]):
 
     # Loading too much data is slow...
     tf_size_guidance = {
@@ -26,38 +26,42 @@ def get_tensorflow_log(path, scores={}, event_tags={}):
 
     # Show all tags in the log file
     print('Event tags are')
-    print(event_acc.Tags())
-
-    fids =   event_acc.Scalars('eval/fid')
-    iss = event_acc.Scalars('eval/incscore')
-
-    for r in fids:
-        scores[r.step] = [r.value]
-
-    for r in iss:
-        if r.step in scores:
-            scores[r.step].append(r.value)
-        else:
-            scores[r.step] = [-1,r.value]
+    tags = event_acc.Tags()
+    
+    event_tags = tags['scalar'] if 'scalars' in tags else []
+    event_tags = [et for et in event_tags if 'eval' in et]
+    
+    for event_tag in event_tags:
+        score_name = event_tag.split('/')[-1]
+        if score_name not in score_names:
+            score_names.append(score_name)
             
-    return scores
+        events = event_acc.Scalars(event_tag)
+        for event in events:
+            if event.step not in scores:
+                scores[event.step] = {}
+            scores[event.step][event_tag] = event.value
 
-def print_tensorflow_log(scores):
+    return scores, score_names
+
+def print_tensorflow_log(scores, score_names):
 
     steps = sorted(scores.keys())
 
-    print('step,fid,IS')
+    print(','.join(['step'] + score_names))
     for step in steps:
-        print('{:06d},{:.2f},{:.2f}'.format(step, scores[step][0], scores[step][1]))
+        row = [( '{:.2f}'.format(scores[step][name]) if name in scores[step] else '') for name in score_names]
+        print(','.join(['{:06d}'.format(step)] + row))
 
 if __name__ == '__main__':
     scores = {}
+    score_names = []
     with fileinput.input() as f_input:
         for i, line in enumerate(f_input):
             if i == 0:
                 print('Skipping first line: {}',format(line.strip()))
             else:
                 print('Getting scores for: {}',format(line.strip()))
-                scores = get_tensorflow_log(line.strip(), scores)
+                scores = get_tensorflow_log(line.strip(), scores, score_names)
     print('Printing scores:')
     print_tensorflow_log(scores)
