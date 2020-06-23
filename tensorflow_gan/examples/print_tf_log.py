@@ -62,6 +62,6 @@ if __name__ == '__main__':
                 print('Skipping first line: {}',format(line.strip()))
             else:
                 print('Getting scores for: {}',format(line.strip()))
-                scores = get_tensorflow_log(line.strip(), scores, score_names)
+                scores, score_names = get_tensorflow_log(line.strip(), scores, score_names)
     print('Printing scores:')
     print_tensorflow_log(scores, score_names)
