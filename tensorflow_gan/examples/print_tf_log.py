@@ -11,13 +11,13 @@ import fileinput
 import numpy as np
 from tensorboard.backend.event_processing.event_accumulator import EventAccumulator
 
-def get_tensorflow_log(path, scores={}):
+def get_tensorflow_log(path, scores={}, event_tags={}):
 
     # Loading too much data is slow...
     tf_size_guidance = {
         'compressedHistograms': 0,
         'images': 0,
-        'scalars': 100,
+        'scalars': 1000,
         'histograms': 0
     }
 
@@ -25,7 +25,8 @@ def get_tensorflow_log(path, scores={}):
     event_acc.Reload()
 
     # Show all tags in the log file
-    #print(event_acc.Tags())
+    print('Event tags are')
+    print(event_acc.Tags())
 
     fids =   event_acc.Scalars('eval/fid')
     iss = event_acc.Scalars('eval/incscore')
