@@ -40,7 +40,7 @@ def get_tensorflow_log(path, scores={}, score_names=[]):
         for event in events:
             if event.step not in scores:
                 scores[event.step] = {}
-            scores[event.step][event_tag] = event.value
+            scores[event.step][score_name] = event.value
 
     return scores, score_names
 
