@@ -28,7 +28,7 @@ def get_tensorflow_log(path, scores={}, score_names=[]):
     print('Event tags are')
     tags = event_acc.Tags()
     
-    event_tags = tags['scalar'] if 'scalars' in tags else []
+    event_tags = tags['scalars'] if 'scalars' in tags else []
     event_tags = [et for et in event_tags if 'eval' in et]
     
     for event_tag in event_tags:
