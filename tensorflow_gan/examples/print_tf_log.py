@@ -12,6 +12,8 @@ import numpy as np
 from tensorboard.backend.event_processing.event_accumulator import EventAccumulator
 
 def get_tensorflow_log(path, scores={}, score_names=[]):
+    """Print every event that has 'eval' in  csv format to the screen.
+    """
 
     # Loading too much data is slow...
     tf_size_guidance = {
@@ -24,8 +26,6 @@ def get_tensorflow_log(path, scores={}, score_names=[]):
     event_acc = EventAccumulator(path, tf_size_guidance)
     event_acc.Reload()
 
-    # Show all tags in the log file
-    print('Event tags are')
     tags = event_acc.Tags()
     
     event_tags = tags['scalars'] if 'scalars' in tags else []
