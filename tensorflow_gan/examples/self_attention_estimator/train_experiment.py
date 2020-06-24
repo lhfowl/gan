@@ -202,6 +202,7 @@ def gen_images(hparams):
   # modified body of make_estimator(hparams)
   discriminator = _get_discriminator(hparams)
   generator = _get_generator_to_be_conditioned(hparams)
+  
 
   if hparams.tpu_params.use_tpu_estimator:
     config = est_lib.get_tpu_run_config_from_hparams(hparams)
@@ -209,6 +210,15 @@ def gen_images(hparams):
   else:
     config = est_lib.get_run_config_from_hparams(hparams)
     estimator = est_lib.get_gpu_estimator(generator, discriminator, hparams, config)
+  
+  # tf.compat.v1.logging.info('Counting params...')
+  # total_parameters = 0
+  # for variable in estimator.get_variable_names():
+  #   vval = estimator.get_variable_value(variable)
+  #   nparam = np.prod(estimator.get_variable_value(variable).shape)
+  #   total_parameters += int(nparam)
+  # tf.compat.v1.logging.info('Found %i params.' % total_parameters)
+  # print(total_parameters)
   
   ckpt_str =  evaluation.latest_checkpoint(hparams.model_dir)
   tf.compat.v1.logging.info('Evaluating checkpoint: %s' % ckpt_str)
