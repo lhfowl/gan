@@ -9,7 +9,8 @@ export ADDITIONAL='--critic_type=acgan \
 --aux_mhinge_cond_discriminator_weight=1.0 \
 --extra_eval_metrics \
 --eval_batch_size=1024 \
---num_eval_steps=9'
+--num_eval_steps=9 \
+--keep_checkpoint_max=10'
 
 
 bash tpu/_base.sh

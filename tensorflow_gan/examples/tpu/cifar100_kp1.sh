@@ -12,6 +12,7 @@ export ADDITIONAL='--critic_type=kplusone_fm \
 --tpu_gan_estimator_d_step=4 \
 --extra_eval_metrics \
 --eval_batch_size=1024 \
---num_eval_steps=9'
+--num_eval_steps=9 \
+--keep_checkpoint_max=20'
 
 bash tpu/_base.sh

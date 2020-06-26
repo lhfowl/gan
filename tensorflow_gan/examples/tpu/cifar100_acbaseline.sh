@@ -9,6 +9,7 @@ export ADDITIONAL='--critic_type=acgan \
 --aux_cond_generator_weight=0.1 \
 --aux_cond_discriminator_weight=1.0 \
 --extra_eval_metrics=true \
---tpu_gan_estimator_d_step=4'
+--tpu_gan_estimator_d_step=4 \
+--keep_checkpoint_max=10'
 
 bash tpu/_base.sh

@@ -8,6 +8,7 @@ export DATASET_ARGS='--image_size=32 --dataset_name=cifar100 --num_classes=100 -
 export ADDITIONAL='--critic_type=acgan \
 --extra_eval_metrics \
 --eval_batch_size=1024 \
---num_eval_steps=9'
+--num_eval_steps=9 \
+--keep_checkpoint_max=20'
 
 bash tpu/_base.sh
