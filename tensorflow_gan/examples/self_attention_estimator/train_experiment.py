@@ -156,7 +156,10 @@ def train_eval_input_fn(mode, params, restrict_classes=None, shift_classes=0):
     
     def _make_labels(y):
       return gen_module.make_one_batch_constant_labels(bs, y)
-    labs_ds = tf.data.Dataset.from_tensor_slices(list(range(flags.FLAGS.num_classes))).repeat().map(_make_labels)
+    labels_todo = list(range(flags.FLAGS.num_classes))
+    # hack to print your favorite classes
+    # labels_todo = list(sorted([130,96,90,88,164,175,281,289,290,292,294,323,441,475,555,581,607,654,661,663,688,779] * 5))
+    labs_ds = tf.data.Dataset.from_tensor_slices(labels_todo).repeat().map(_make_labels)
     
     ds = tf.data.Dataset.zip((noise_ds, images_ds, labs_ds))
     ds = ds.map(lambda noise_ds_, images_ds_, labs_ds_: {'z': noise_ds_, 'labels': labs_ds_} ) # fake data only
