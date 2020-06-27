@@ -7,7 +7,7 @@ export DATASET_ARGS='--image_size=32 \
 --num_classes=100 \
 --dataset_val_split_name=train'
 export ADDITIONAL="--critic_type=kplusone_wgan \
---generator_loss_fn=kplusone_featurematching_generator_loss \
+--generator_loss_fn=kplusone_wasserstein_generator_loss \
 --num_eval_steps=100 \
 --mode=intra_fid_eval \
 --intra_fid_eval_chunk_size=50"
