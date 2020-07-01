@@ -104,6 +104,85 @@ def block(x, labels, out_channels, num_classes, name, training=True):
     return x_0 + x
 
 
+def conditional_batch_norm(inputs,
+               y,
+               is_training,
+               axis=-1,
+               variance_epsilon=1e-3,
+               center=True,
+               scale=True,
+               beta_initializer=tf.compat.v1.initializers.zeros(),
+               gamma_initializer=tf.compat.v1.initializers.ones(),
+               batch_axis=0,
+               name='batch_norm'):
+  """Adds Conditional Batch Norm when label is not a class label.
+  
+  Taken from compare_gan arch_ops's conditional_batch_norm.
+
+  Args:
+    inputs: Tensor of inputs (e.g. images).
+    y: Need not be class labels/one hot.
+    is_training: Whether or not the layer is in training mode. In training
+      mode it would accumulate the statistics of the moments into the
+      `moving_mean` and `moving_variance` using an exponential moving average
+      with the given `decay`. When is_training=False, these variables are not
+      updated, and the precomputed values are used verbatim.
+    axis: Integer, the axis that should be normalized (typically the features
+        axis). For instance, after a `Convolution2D` layer with
+        `data_format="channels_first"`, set `axis=1` in `BatchNormalization`.
+    variance_epsilon: A small float number to avoid dividing by 0.
+    center: If True, add offset of `beta` to normalized tensor. If False,
+      `beta` is ignored.
+    scale: If True, multiply by `gamma`. If False, `gamma` is
+      not used. When the next layer is linear (also e.g. `nn.relu`), this can
+      be disabled since the scaling can be done by the next layer.
+    beta_initializer: Initializer for the beta weight.
+    gamma_initializer: Initializer for the gamma weight.
+    batch_axis: The axis of the batch dimension.
+    name: name: String name to be used for scoping.
+  Returns:
+    Output tensor.
+  """
+  if y is None:
+    raise ValueError("You must provide y for conditional batch normalization.")
+  if y.shape.ndims != 2:
+    raise ValueError("Conditioning must have rank 2.")
+  with tf.compat.v1.variable_scope(
+      name, values=[inputs], reuse=tf.compat.v1.AUTO_REUSE):
+    outputs = tfgan.tpu.standardize_batch(inputs, is_training=is_training)
+    num_channels = tf.compat.dimension_value(inputs.shape[-1])
+    with tf.compat.v1.variable_scope(
+      "condition", values=[inputs, y], reuse=tf.compat.v1.AUTO_REUSE):
+      if scale:
+        gamma = ops.snlinear(y, num_channels, name="gamma", use_bias=False)
+        gamma = tf.reshape(gamma, [-1, 1, 1, num_channels])
+        outputs *= gamma
+      if center:
+        beta = ops.snlinear(y, num_channels, name="beta", use_bias=False)
+        beta = tf.reshape(beta, [-1, 1, 1, num_channels])
+        outputs += beta
+      return outputs
+
+def biggan_block(x, y, out_channels, num_classes, name, training=True):
+  """Builds the residual blocks used in the generator.
+  ...
+  """
+  with tf.compat.v1.variable_scope(name):
+    x_0 = x
+    x = tf.nn.relu(conditional_batch_norm(x, y, training,
+                                        name='cbn_0'))
+    x = usample(x)
+    x = ops.snconv2d(x, out_channels, 3, 3, 1, 1, training, 'snconv1')
+    x = tf.nn.relu(conditional_batch_norm(x, y, training,
+                                        name='cbn_1'))
+    x = ops.snconv2d(x, out_channels, 3, 3, 1, 1, training, 'snconv2')
+
+    x_0 = usample(x_0)
+    x_0 = ops.snconv2d(x_0, out_channels, 1, 1, 1, 1, training, 'snconv3')
+
+    return x_0 + x
+
+
 def generator_32(zs, target_class, gf_dim, num_classes, training=True):
   """Builds the generator segment of the graph, going from z -> G(z).
 
@@ -212,10 +291,55 @@ def generator_128(zs, target_class, gf_dim, num_classes, training=True):
       tf.compat.v1.GraphKeys.TRAINABLE_VARIABLES, gen_scope.name)
   return out, var_list
 
+def biggan_generator_128(z, target_class, gf_dim, num_classes, training=True):
+  """...
+  
+  y is embedded, and skip concatenate with z
+  
+  4th block has attention (64x64 resolution)
+  
+  batch norm is conditional batch norm
+  no layer_norm
+  """
+  # setables
+  embed_y_dim = 128
+  embed_bias = False
+  with tf.compat.v1.variable_scope(
+      'generator', reuse=tf.compat.v1.AUTO_REUSE) as gen_scope:
+    num_blocks = 5
+    # embedding of y that is shared
+    target_class_onehot = tf.one_hot(target_class, num_classes)
+    y = ops.linear(target_class_onehot, embed_y_dim, use_bias=embed_bias, name="embed_y")
+    y_per_block = num_blocks * [y]
+    # skip z connections / hierarchical z
+    z_per_block = tf.split(z, num_blocks + 1, axis=1)
+    z0, z_per_block = z_per_block[0], z_per_block[1:]
+    y_per_block = [tf.concat([zi, y], 1) for zi in z_per_block]
+
+    act0 = ops.snlinear(
+        z0, gf_dim * 16 * 4 * 4, training=training, name='g_snh0')
+    act0 = tf.reshape(act0, [-1, 4, 4, gf_dim * 16])
+
+    # pylint: disable=line-too-long
+    act1 = biggan_block(act0, y_per_block[0], gf_dim * 16, num_classes, 'g_block1', training)  # 8
+    act2 = biggan_block(act1, y_per_block[1], gf_dim * 8, num_classes, 'g_block2', training)  # 16
+    act3 = biggan_block(act2, y_per_block[2], gf_dim * 4, num_classes, 'g_block3', training)  # 32
+    act4 = biggan_block(act3, y_per_block[3], gf_dim * 2, num_classes, 'g_block4', training)  # 64
+    act4 = ops.sn_non_local_block_sim(act4, training, name='g_ops') # 64
+    act5 = biggan_block(act4, y_per_block[4], gf_dim, num_classes, 'g_block5', training)  # 128
+    act5 = tf.nn.relu(tfgan.tpu.batch_norm(act5, training, conditional_class_labels=None, name='g_bn'))
+    act6 = ops.snconv2d(act5, 3, 3, 3, 1, 1, training, 'g_snconv_last')
+    out = (tf.nn.tanh(act6) + 1.0) / 2.0
+  var_list = tf.compat.v1.get_collection(
+      tf.compat.v1.GraphKeys.TRAINABLE_VARIABLES, gen_scope.name)
+  return out, var_list
+
+is_biggan = 'biggan' in flags.FLAGS.critic_type
 generators = {
-  32: generator_32,
-  64: generator_64,
-  128: generator_128,
+  (False, 32): generator_32,
+  (False, 64): generator_64,
+  (False, 128): generator_128,
+  (True, 128): biggan_generator_128,
 }
 
-generator = generators[flags.FLAGS.image_size]
+generator = generators[(is_biggan, flags.FLAGS.image_size)]
