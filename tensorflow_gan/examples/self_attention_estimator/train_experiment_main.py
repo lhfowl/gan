@@ -165,6 +165,8 @@ def main(_):
   log.addHandler(fh)
     
   tpu_location = FLAGS.tpu
+  if ',' in tpu_location:
+    tpu_location = tpu_location.split(',')
   hparams = train_experiment.HParams(
       train_batch_size=FLAGS.train_batch_size,
       eval_batch_size=FLAGS.eval_batch_size,
