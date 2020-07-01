@@ -149,7 +149,7 @@ def conditional_batch_norm(inputs,
     raise ValueError("Conditioning must have rank 2.")
   with tf.compat.v1.variable_scope(
       name, values=[inputs], reuse=tf.compat.v1.AUTO_REUSE):
-    outputs = tfgan.tpu.standardize_batch(inputs, is_training=is_training)
+    outputs = tfgan.tpu.standardize_batch(inputs, is_training=is_training, decay=0.9, epsilon=1e-5, use_moving_averages=False)
     num_channels = tf.compat.dimension_value(inputs.shape[-1])
     with tf.compat.v1.variable_scope(
       "condition", values=[inputs, y], reuse=tf.compat.v1.AUTO_REUSE):
