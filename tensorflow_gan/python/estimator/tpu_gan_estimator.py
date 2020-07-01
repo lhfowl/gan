@@ -101,7 +101,7 @@ class TPUGANEstimator(tf.compat.v1.estimator.tpu.TPUEstimator):
       get_eval_metric_ops_fn=None,
       add_summaries=None,
       joint_train=False,
-      gan_train_steps=tfgan_tuples.GANTrainSteps(1, flags.FLAGS.tpu_gan_estimator_d_step),
+      gan_train_steps=tfgan_tuples.GANTrainSteps(flags.FLAGS.tpu_gan_estimator_g_step, flags.FLAGS.tpu_gan_estimator_d_step),
       # TPUEstimator options.
       model_dir=None,
       config=None,

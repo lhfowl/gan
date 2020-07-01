@@ -49,10 +49,8 @@ flags.DEFINE_float('kplusone_mhinge_cond_discriminator_weight', None,
                   '..., default is None.')
 flags.DEFINE_float('kplusone_mhinge_ssl_cond_discriminator_weight', None, 
                   '..., default is None.')
-flags.DEFINE_integer(
-    'tpu_gan_estimator_d_step', 1,
-    '...')
-
+flags.DEFINE_integer( 'tpu_gan_estimator_d_step', 1, '...')
+flags.DEFINE_integer( 'tpu_gan_estimator_g_step', 1, '...')
 
 mock = tf.compat.v1.test.mock
 

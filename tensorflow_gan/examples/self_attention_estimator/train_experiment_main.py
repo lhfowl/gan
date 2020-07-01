@@ -132,9 +132,8 @@ flags.DEFINE_float('kplusone_mhinge_ssl_cond_discriminator_weight', None,
 flags.DEFINE_enum(
     'generator_loss_fn', None, ['kplusone_wasserstein_generator_loss', 'kplusone_featurematching_generator_loss', 'kplusone_ssl_featurematching_generator_loss'],
     '...')
-flags.DEFINE_integer(
-    'tpu_gan_estimator_d_step', 1,
-    '...')
+flags.DEFINE_integer( 'tpu_gan_estimator_d_step', 1, '...')
+flags.DEFINE_integer( 'tpu_gan_estimator_g_step', 1, '...')
 flags.DEFINE_float('generator_margin_size', 1.0, 'Used in achingegan_generator_loss.')
 flags.DEFINE_integer( 'intra_fid_eval_chunk_size', None, '...')
 flags.DEFINE_integer( 'tfdf_num_parallel_calls', 16, '...')
