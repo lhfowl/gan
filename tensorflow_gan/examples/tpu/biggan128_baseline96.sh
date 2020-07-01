@@ -1,5 +1,5 @@
 
-export EXPERIMENT_NAME=imagenet128_biggan_baseline96
+export EXPERIMENT_NAME=imagenet128_biggan_baseline96_bs2048
 export BATCH_SIZE=2048
 export TRAIN_STEPS_PER_EVAL=2500
 export DATASET_ARGS='--image_size=128 --dataset_name=imagenet2012 --num_classes=1000 --dataset_val_split_name=validation'
