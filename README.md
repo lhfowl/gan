@@ -192,7 +192,7 @@ tensorboard --logdir=${STORAGE_BUCKET}/experiments/${EXPERIMENT_NAME} --master_t
 Most useful is the [TPU profiling](https://cloud.google.com/tpu/docs/tensorboard-setup#static-trace-viewer):
 
 ```
-capture_tpu_--port=8080 u=${TPU_NAME} --tpu_zone=${experiments/${EXPERIMENT_NAME}UCKET}/logdir
+capture_tpu_profile --port=8080 --tpu=${TPU_NAME} --tpu_zone=${ZONE} --logdir=gs://${BUCKET_NAME}/experiments/${EXPERIMENT_NAME}/logdir
 ```
 
 ### Downloading log files and monitoring locally (Not recommended)
