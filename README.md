@@ -44,6 +44,9 @@ Because of the design choices everything outside of the SAGAN example, including
 - MHGAN does IS 61.98 and FID 13.27 within 1M iter. Explodes around the same time.
 - ACGAN with cross entropy does IS 48.94 and FID 24.72.
 
+Batch size of 1024, 1 D step per G step, 64 chan, and more as seen in `gan/tensorflow_gan/examples/tpu/imagenet128_baseline.sh`.
+1M steps takes about 10 days on a v3-8 TPU.
+
 ## How to run
 
 See scripts in:
@@ -69,6 +72,7 @@ To run a small experiment, see for example:
 - `/gan/tensorflow_gan/examples/gpu/cifar_ramawks69.sh`
 - `/gan/tensorflow_gan/examples/tpu/cifar100.sh`
 
+Such an experiment takes only an hour to get to 200k on a v3-8 TPU.
 
 ## Installation GPU
 
