@@ -1,85 +1,252 @@
-# TensorFlow-GAN (TF-GAN)
+# cGANs with Multi-Hinge Loss: tensorflow TPU and GPU implementation
 
-TF-GAN is a lightweight library for training and evaluating [Generative
+![MHGAN sample](./tensorflow_gan/examples/self_attention_estimator/images/both_rows.jpg)
+
+This code is forked from TF-GAN. TF-GAN is a lightweight library for training and evaluating [Generative
 Adversarial Networks (GANs)](https://arxiv.org/abs/1406.2661).
 
+This code implements cGANs with Multi-Hinge Loss, for fully and semi supervised settings.
+It uses the Imagenet, Cifar100, Cifar10 datasets.
 
-* Can be installed with `pip` using `pip install tensorflow-gan`, and used
-with `import tensorflow_gan as tfgan`
-* [Well-tested examples](https://github.com/tensorflow/gan/tree/master/tensorflow_gan/examples/)
-* [Interactive introduction to TF-GAN](https://github.com/tensorflow/gan/blob/master/tensorflow_gan/examples/colab_notebooks/tfgan_tutorial.ipynb) in colaboratory
+Please cite:
 
-## Structure of the TF-GAN Library
-
-TF-GAN is composed of several parts, which are designed to exist independently:
-
-*   [Core](https://github.com/tensorflow/gan/tree/master/tensorflow_gan/python/train.py):
-    the main infrastructure needed to train a GAN. Set up training with
-    any combination of TF-GAN library calls, custom-code, native TF code, and other frameworks
-*   [Features](https://github.com/tensorflow/gan/tree/master/tensorflow_gan/python/features/):
-    common GAN operations and
-    normalization techniques, such as instance normalization and conditioning.
-*   [Losses](https://github.com/tensorflow/gan/tree/master/tensorflow_gan/python/losses/):
-    losses and
-    penalties, such as the Wasserstein loss, gradient penalty, mutual
-    information penalty, etc.
-*   [Evaluation](https://github.com/tensorflow/gan/tree/master/tensorflow_gan/python/eval/):
-    standard GAN evaluation metrics.
-    Use `Inception Score`, `Frechet Distance`, or `Kernel Distance` with a
-    pretrained Inception network to evaluate your unconditional generative
-    model. You can also use your own pretrained classifier for more specific
-    performance numbers, or use other methods for evaluating conditional
-    generative models.
-*   [Examples](https://github.com/tensorflow/gan/tree/master/tensorflow_gan/):
-    simple examples on how to use TF-GAN, and more complicated state-of-the-art examples
-
-## Who uses TF-GAN?
-
-Numerous projects inside Google. The following are some published papers that use TF-GAN:
-
-*   [Self-Attention Generative Adversarial Networks](https://arxiv.org/abs/1805.08318)
-*   [Large Scale GAN Training for High Fidelity Natural Image Synthesis](https://arxiv.org/abs/1809.11096)
-*   [GANSynth: Adversarial Neural Audio Synthesis](https://arxiv.org/abs/1902.08710)
-*   [Boundless: Generative Adversarial Networks for Image Extension](http://arxiv.org/abs/1908.07007)
-*   [NetGAN: Generating Graphs via Random Walks](https://arxiv.org/abs/1803.00816)
-*   [Discriminator rejection sampling](https://arxiv.org/abs/1810.06758)
-*   [Generative Models for Effective ML on Private, Decentralized Datasets](https://arxiv.org/pdf/1911.06679.pdf)
-
-The framework [Compare GAN](https://github.com/google/compare_gan) uses TF-GAN,
-especially the evaluation metrics. [Their papers](https://github.com/google/compare_gan#compare-gan)
-use TF-GAN to ensure consistent and comparable evaluation metrics.
-Some of those papers are:
-
-*   [Are GANs Created Equal? A Large-Scale Study](https://arxiv.org/abs/1711.10337)
-*   [The GAN Landscape: Losses, Architectures, Regularization, and Normalization](https://arxiv.org/abs/1807.04720)
-*   [Assessing Generative Models via Precision and Recall](https://arxiv.org/abs/1806.00035)
-*   [High-Fidelity Image Generation With Fewer Labels](https://arxiv.org/abs/1903.02271)
-
-## Training a GAN model
-
-Training in TF-GAN typically consists of the following steps:
-
-1. Specify the input to your networks.
-1. Set up your generator and discriminator using a `GANModel`.
-1. Specify your loss using a `GANLoss`.
-1. Create your train ops using a `GANTrainOps`.
-1. Run your train ops.
-
-At each stage, you can either use TF-GAN's convenience functions, or you can
-perform the step manually for fine-grained control.
-
-There are various types of GAN setup. For instance, you can train a generator
-to sample unconditionally from a learned distribution, or you can condition on
-extra information such as a class label. TF-GAN is compatible with many setups,
-and we demonstrate in the well-tested [examples directory](https://github.com/tensorflow/gan/tree/master/tensorflow_gan/examples/)
+```
+@misc{kavalerov2019cgans,
+    title={cGANs with Multi-Hinge Loss},
+    author={Ilya Kavalerov and Wojciech Czaja and Rama Chellappa},
+    year={2019},
+    eprint={1912.04216},
+    archivePrefix={arXiv},
+    primaryClass={cs.LG}
+}
+```
 
 
-## Maintainers
+## What's in this repository
 
-* (Documentation) David Westbrook, westbrook@google.com
-* Joel Shor, joelshor@google.com, [github](https://github.com/joel-shor)
-* Aaron Sarna, sarna@google.com, [github](https://github.com/aaronsarna)
-* Yoel Drori, dyoel@google.com, [github](https://github.com/yoeldr)
+- Baseline SAGAN
+- Working Baseline ACGAN with many auxiliary loss choices
+- Multi-Hinge GAN
+- batched intra-fid calculation for significant speedup
+- K+1 GANs
+- print out eval metrics in google cloud without tensorboard and with no more than 6GB of mem required.
 
-## Authors
-* Joel Shor, joelshor@google.com, [github](https://github.com/joel-shor)
+These work on both TPU and GPU, but the TPU implementation has more features.
+
+This code builds off of the tf example for [Self-Attention Generative Adversarial Networks](https://arxiv.org/abs/1805.08318).
+See more info [here](https://github.com/tensorflow/gan/tree/master/tensorflow_gan/examples/self_attention_estimator).
+All other examples are ignored.
+Because of the design choices everything outside of the SAGAN example, including all tests not specified below, may no longer work.
+
+## Performance on Imagenet128
+
+- Baseline SAGAN runs the same as seen [here](https://github.com/tensorflow/gan/tree/master/tensorflow_gan/examples/self_attention_estimator), IS 52.79 and FID 16.39 after 1M iters. Explodes soon after.
+- MHGAN does IS 61.98 and FID 13.27 within 1M iter. Explodes around the same time.
+- ACGAN with cross entropy does IS 48.94 and FID 24.72.
+
+## How to run
+
+See scripts in:
+- `gan/tensorflow_gan/examples/gpu/*.sh`
+- `gan/tensorflow_gan/examples/tpu/*.sh`
+
+To replicate the baseline:
+
+- `gan/tensorflow_gan/examples/tpu/imagenet128_baseline.sh`
+
+To replicate MHingeGAN:
+
+- `gan/tensorflow_gan/examples/tpu/imagenet128.sh`
+
+To eval:
+
+- `gan/tensorflow_gan/examples/tpu/eval_ifid_imagenet128.sh`
+- `gan/tensorflow_gan/examples/gpu/eval_imagenet128.sh`
+- `gan/tensorflow_gan/examples/tpu/genimages_imagenet128.sh`
+
+To run a small experiment, see for example:
+
+- `/gan/tensorflow_gan/examples/gpu/cifar_ramawks69.sh`
+- `/gan/tensorflow_gan/examples/tpu/cifar100.sh`
+
+
+## Installation GPU
+
+Use miniconda3, python 3.7.7, tensorflow 2.1, cuda/10.1.243, cudnn/v7.6.5. Install `venvtf2p1.yml`.
+
+In general:
+
+
+```
+pip install tensorflow_datasets
+pip install tensorflow_gan
+pip uninstall -y tensorflow_probability
+pip install tensorflow_probability==0.7
+pip install pillow
+```
+
+## Setup GPU
+
+```
+export TFGAN_REPO=`pwd`
+export PYTHONPATH=${TFGAN_REPO}/tensorflow_gan/examples:${PYTHONPATH}
+export PYTHONPATH=${TFGAN_REPO}:${PYTHONPATH}
+cd tensorflow_gan/examples
+```
+
+Then run a script in `gpu/`.
+
+## Requesitioning TPU
+
+See [Quickstart](https://cloud.google.com/tpu/docs/quickstart) but in general:
+
+```
+export PROJECT_NAME=xxx-xxx-xxx
+export PROJECT_ID=${PROJECT_NAME}
+gcloud config set project ${PROJECT_NAME}
+
+export ZONE="europe-west4-a"
+export REGION="europe-west4"
+ctpu up --zone=${ZONE} --tpu-size="v3-8" --tf-version=2.1 --name=${TPU_NAME} --machine-type=n1-standard-1
+```
+
+For lower costs the following custom size is sufficient for a v3-8 TPU.
+The following command uses an image that can be created after launching in the general way above.
+
+```
+gcloud beta compute instances create tpu-eu-1 --zone=${ZONE} --source-machine-image tf2p1 --custom-cpu 1 --custom-memory 6 --custom-vm-type n1
+```
+
+## (Re)Connect to TPU
+
+In general:
+
+```
+gcloud compute ssh ${TPU_NAME} --zone=${ZONE}
+```
+
+OR if using a custom instance:
+
+```
+gcloud beta compute ssh --zone=${ZONE} ${TPU_NAME} --project=${PROJECT_NAME}
+```
+
+Once inside the TPU:
+
+```
+export ZONE="europe-west4-a"
+export REGION="europe-west4"
+export BUCKET_NAME="mybucket"
+```
+
+```
+export PROJECT_NAME=xxx-xxx-xxx
+export PROJECT_ID=${PROJECT_NAME}
+export STORAGE_BUCKET=gs://${BUCKET_NAME}
+export TPU_ZONE=${ZONE}
+```
+
+## Installation TPU
+
+Use python3.7, tensorflow 2.1.
+
+After launching run:
+
+```
+pip3.7 install --upgrade tensorflow_datasets --user
+git clone --single-branch --branch dev https://github.com/ilyakavagan.git
+pip3.7 install tensorflow_gan --user
+```
+
+## Setup TPU
+
+```
+export TFGAN_REPO=/home/ilyak/gan
+export PYTHONPATH=${TFGAN_REPO}/tensorflow_gan/examples:${PYTHONPATH}
+export PYTHONPATH=${TFGAN_REPO}:${PYTHONPATH}
+
+cd gan/tensorflow_gan/examples
+
+git pull origin dev
+source tpu/retry.sh
+```
+
+## TPU monitoring
+
+### Print eval metrics in the cloud
+
+This requires a separate cpu instance, 6GB is enough memory.
+
+Use `gan/tensorflow_gan/examples/print_tf_log.py`
+
+### Monitoring in the cloud
+
+Cloud tpu tensorboard crashes very often, but it does work during the 1st hour of training while there are few logfiles.
+Run it with:
+
+```
+export TPU_IP=XX.XXX.X.X
+tensorboard --logdir=${STORAGE_BUCKET}/experiments/${EXPERIMENT_NAME} --master_tpu_unsecure_channel=${TPU_IP}
+```
+
+Most useful is the [TPU profiling](https://cloud.google.com/tpu/docs/tensorboard-setup#static-trace-viewer):
+
+```
+capture_tpu_--port=8080 u=${TPU_NAME} --tpu_zone=${experiments/${EXPERIMENT_NAME}UCKET}/logdir
+```
+
+### Downloading log files and monitoring locally (Not recommended)
+
+[Install gsutil](https://cloud.google.com/storage/docs/gsutil_install)
+
+`gsutil cp -R ${STORAGE_BUCKET}/experiments/${EXPERIMENT_NAME}/eval_eval ./${EXPERIMENT_NAME}/`
+
+and launch tensorboard locally. Will incure high egress costs.
+
+## TPU/Cloud Teardown
+
+Check status with:
+
+`ctpu status --zone=$ZONE --name=${TPU_NAME}`
+
+Use the google cloud console. Note that TPUs and their CPU hosts have to be killed separately.
+- https://console.cloud.google.com/compute/tpus
+- https://console.cloud.google.com/compute/instances
+
+Remove buckets with:
+
+`gsutil rm -r gs://${BUCKET_NAME}/experiments/${EXPERIMENT_NAME}`
+
+## Setup: Prepare Data
+
+Open a python REPL and:
+
+```
+# if you don't do this, it will crash on Imagenet
+import resource
+low, high = resource.getrlimit(resource.RLIMIT_NOFILE)
+resource.setrlimit(resource.RLIMIT_NOFILE, (high, high))
+
+import tensorflow_datasets as tfds
+```
+
+Then depending on your dataset:
+
+- `ds = tfds.load('imagenet_resized/64x64', split="train", data_dir="/mydir/data/tfdf")`
+- `ds = tfds.load('cifar100', split="train", data_dir="/mydir/data/tfdf")`
+- `ds = tfds.load("cifar10", split="train", data_dir="/mydir/data/tfdf")`
+
+For Imagenet at 128x128, you need to manually download the data and place the compressed files in the tfdf data_dir downloads folder before running 
+
+`ds = tfds.load("imagenet2012", split="train", data_dir="gs://mybucket/data")`
+
+Be forewarned Imagenet128 takes several hours to download and over 24 hours to setup initially on a n1-standard-2 instance.
+
+## Run Tests GPU
+
+The only tests maintained are related to intra-fid calculation:
+
+```
+CUDA_VISIBLE_DEVICES=0 python tensorflow_gan/python/eval/eval_utils_test.py
+CUDA_VISIBLE_DEVICES=0 python tensorflow_gan/python/eval/classifier_metrics_test.py
+```
