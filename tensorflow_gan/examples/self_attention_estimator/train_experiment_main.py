@@ -158,14 +158,16 @@ def main(_):
   
   # create file handler
   logging_dir = os.environ['HOME'] if FLAGS.use_tpu else FLAGS.model_dir
+  if not os.path.isdir(logging_dir):
+    os.makedirs(logging_dir)
   fh = logging.FileHandler(logging_dir + '/tensorflow.log')
   fh.setLevel(logging.INFO)
   fh.setFormatter(formatter)
   log.addHandler(fh)
     
   tpu_location = FLAGS.tpu
-  if ',' in tpu_location:
-    tpu_location = tpu_location.split(',')
+  if FLAGS.use_tpu:
+    assert ',' not in tpu_location, 'Only using 1 TPU is supported'
   hparams = train_experiment.HParams(
       train_batch_size=FLAGS.train_batch_size,
       eval_batch_size=FLAGS.eval_batch_size,
