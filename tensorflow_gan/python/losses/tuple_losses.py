@@ -209,6 +209,17 @@ multihingegan_ssl_discriminator_loss = args_to_gan_model(
     tfgan_losses.multihingegan_ssl_discriminator_loss)
 kplusone_ssl_featurematching_generator_loss = args_to_gan_model(
     tfgan_losses.kplusone_ssl_featurematching_generator_loss)
+# more K+1 GAN losses
+kplusonegan_nll_discriminator_loss = args_to_gan_model(
+    tfgan_losses.kplusonegan_nll_discriminator_loss)
+kplusonegan_activationmaxizaion_generator_loss = args_to_gan_model(
+    tfgan_losses.kplusonegan_activationmaxizaion_generator_loss)
+kplusonegan_pll_generator_loss = args_to_gan_model(
+    tfgan_losses.kplusonegan_pll_generator_loss)
+kplusonegan_csc_generator_loss = args_to_gan_model(
+    tfgan_losses.kplusonegan_csc_generator_loss)
+kplusonegan_confuse_generator_loss = args_to_gan_model(
+    tfgan_losses.kplusonegan_confuse_generator_loss)
 
 
 # Original losses from `Generative Adversarial Nets`

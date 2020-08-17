@@ -28,6 +28,7 @@ Please cite:
 - Working Baseline ACGAN with many auxiliary loss choices
 - Multi-Hinge GAN
 - batched intra-fid calculation for significant speedup
+    + Imagenet 1000 class intra-fid at 2.5k images per class takes < 18h on v3-8 TPU
 - K+1 GANs
 - print out eval metrics in google cloud without tensorboard and with no more than 6GB of mem required.
 
@@ -38,11 +39,44 @@ See more info [here](https://github.com/tensorflow/gan/tree/master/tensorflow_ga
 All other examples are ignored.
 Because of the design choices everything outside of the SAGAN example, including all tests not specified below, may no longer work.
 
+## Download pretrained models
+
+[Downloads root is here](https://drive.google.com/drive/folders/1SZeCaPrEqRYXUyhWi_BLEEpiJFdtpX1B?usp=sharing)
+
+Note: in some cases multiple checkpoints of weights are given. To control which weights are loaded exit the number in txt 'checkpoint' file in each model directory.
+
+Note: to run eval you need the original dataset.
+
+- Imagenet 128x128 SAGAN
+    - [download pretrained baseline SAGAN model here](https://drive.google.com/drive/folders/1oLBISsbAbs5G-emQ6Roix2-LOQiZEJy1?usp=sharing)
+    - step 1130000 has FID 21.9846 and IS 52.8251
+    - used in `/gan/tensorflow_gan/examples/gpu/example_genimages_imagenet128_baseline.sh`
+    - used in `/gan/tensorflow_gan/examples/gpu/example_eval_imagenet128_baseline.sh`
+- Imagenet 128x128 MHGAN
+    - [download pretrained MHGAN model here](https://drive.google.com/drive/folders/1acQL6rhSIuIzpPvymclbw6cNaee7N1Fy?usp=sharing)
+    - has FID 19.1119 and IS 60.9724
+    - used in `/gan/tensorflow_gan/examples/gpu/example_genimages_imagenet128_expt.sh`
+    - used in `/gan/tensorflow_gan/examples/gpu/example_eval_imagenet128_expt.sh`
+- Imagenet 64x64 high-fidelity-low-diversity contrast
+    - contrast the normal SAGAN model with the high-fidelity-low-diversity one at the later checkpoint
+    - [download pretrained models here](https://drive.google.com/drive/folders/1GfuPWCks08v1Ftgdd7jHL-_TRs7QxgZ-?usp=sharing)
+    - step 999999 has FID 15.482412 and IS 19.486443
+    - step 1014999 has FID 10.249778 and IS 29.656748 but very low diversity
+    - used in `/gan/tensorflow_gan/examples/gpu/example_lowdiversity_eval_imagenet64.sh`
+    - used in `/gan/tensorflow_gan/examples/gpu/example_lowdiversity_genimages_imagenet64.sh`
+- Imagenet 128x128 high-fidelity-low-diversity contrast
+    - contrast the normal SAGAN model with the high-fidelity-low-diversity one at the later checkpoint
+    - [download pretrained models here](https://drive.google.com/drive/folders/1CGjsCqhRinxB3qRf0fmpAA8fYxauOiO6?usp=sharing)
+    - step 580000 has IS 47.79 and FID 17.10
+    - step 585000 has IS 169.68 and FID 8.87 but very low diversity    
+    - used in `/gan/tensorflow_gan/examples/gpu/example_lowdiversity_genimages_imagenet128.sh`
+    - 64000 images sampled from each of these models are [available here](https://drive.google.com/drive/folders/19YD6otbzJv1QbO-jB9tQKdDt1Vrp8YGb?usp=sharing)
+
 ## Performance on Imagenet128
 
-- Baseline SAGAN runs the same as seen [here](https://github.com/tensorflow/gan/tree/master/tensorflow_gan/examples/self_attention_estimator), IS 52.79 and FID 16.39 after 1M iters. Explodes soon after.
-- MHGAN does IS 61.98 and FID 13.27 within 1M iter. Explodes around the same time.
-- ACGAN with cross entropy does IS 48.94 and FID 24.72.
+- Baseline SAGAN runs the same as seen [here](https://github.com/tensorflow/gan/tree/master/tensorflow_gan/examples/self_attention_estimator), (best ever) IS 52.79 and FID 16.39 after 1M iters. Explodes soon after.
+- MHGAN (best ever) IS 61.98 and FID 13.27 within 1M iter. Explodes around the same time.
+- ACGAN with cross entropy does (best ever) IS 48.94 and FID 24.72.
 
 Batch size of 1024, 1 D step per G step, 64 chan, and more as seen in `gan/tensorflow_gan/examples/tpu/imagenet128_baseline.sh`.
 1M steps takes about 10 days on a v3-8 TPU.
@@ -73,6 +107,8 @@ To run a small experiment, see for example:
 - `/gan/tensorflow_gan/examples/tpu/cifar100.sh`
 
 Such an experiment takes only an hour to get to 200k on a v3-8 TPU.
+
+### How to run eval on pretrained models
 
 ## Installation GPU
 
@@ -248,9 +284,14 @@ Be forewarned Imagenet128 takes several hours to download and over 24 hours to s
 
 ## Run Tests GPU
 
-The only tests maintained are related to intra-fid calculation:
+The only tests maintained are related to intra-fid calculation and some new losses:
 
 ```
 CUDA_VISIBLE_DEVICES=0 python tensorflow_gan/python/eval/eval_utils_test.py
 CUDA_VISIBLE_DEVICES=0 python tensorflow_gan/python/eval/classifier_metrics_test.py
+CUDA_VISIBLE_DEVICES=0 python tensorflow_gan/python/losses/other_losses_impl_test.py
 ```
+
+## Contributions
+
+PRs are welcome! See `/gan/DEVREADME.md` for more info.

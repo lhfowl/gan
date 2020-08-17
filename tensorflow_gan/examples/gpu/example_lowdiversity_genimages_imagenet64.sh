@@ -1,8 +1,10 @@
-# export EXPERIMENT_NAME='imagenet64_baseline'
-# export EXPERIMENT_NAME='imagenet64_fixed'
-# export EXPERIMENT_NAME=imagenet64_acbaseline_2step
+# For this experiment compare steps 999999 and 1014999.
+# The model was trained like a normal SAGAN until 1M steps.
+# Then the model was trained according to the high fidelity low diversity
+# method described in the paper.
+
 export EXPERIMENT_NAME=imagenet64_baseline_ctd
-export OUTPUT_DIR=/scratch0/ilya/locDoc/tfgan/${EXPERIMENT_NAME}
+export OUTPUT_DIR=/scratch0/ilya/locDoc/tfgan/examples/${EXPERIMENT_NAME}
 export DATA_DIR=/scratch1/ilya/locDoc/data/tfdf
 
 export BATCH_SIZE=64

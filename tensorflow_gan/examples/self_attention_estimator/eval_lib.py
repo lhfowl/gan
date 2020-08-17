@@ -151,8 +151,8 @@ def predict_and_write_images(estimator, input_fn, model_dir, filename_suffix):
   # Generate images.
   side = 8
   number = 1
-  if flags.FLAGS.mode == 'gen_images' and flags.FLAGS.n_images_per_side_to_gen_per_class is not None:
-    side = flags.FLAGS.n_images_per_side_to_gen_per_class
+  if flags.FLAGS.mode == 'gen_images' and flags.FLAGS.n_images_per_side_to_gen_per_tile is not None:
+    side = flags.FLAGS.n_images_per_side_to_gen_per_tile
     number = flags.FLAGS.num_classes
   image_iterator = estimator.predict(input_fn)
   for n in range(number):

@@ -13,13 +13,13 @@ export DATASET_ARGS='--image_size=128 --dataset_name=imagenet_resized/64x64 --nu
 export ADDITIONAL='--critic_type=acgan \
 --mode=gen_images \
 --gen_images_with_margins \
---n_images_per_side_to_gen_per_class=8 \
+--n_images_per_side_to_gen_per_tile=8 \
 --aux_mhinge_cond_generator_weight=0.1 \
 --aux_mhinge_cond_discriminator_weight=1.0'
 
 # export ADDITIONAL='--critic_type=acgan_multiproj \
 # --mode=gen_images \
 # --gen_images_with_margins \
-# --n_images_per_side_to_gen_per_class=6'
+# --n_images_per_side_to_gen_per_tile=6'
 
 bash gpu/_eval_base.sh

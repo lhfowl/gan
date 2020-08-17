@@ -1,7 +1,6 @@
 # TESTIN COMPATIBILITY ONLY DO NOT USE!
 # WRONG DATASET just for compatibility testing purposes
 
-# export EXPERIMENT_NAME='imagenet128_baseline'
 export EXPERIMENT_NAME='imagenet128_expt'
 export OUTPUT_DIR=/scratch0/ilya/locDoc/tfgan/examples/${EXPERIMENT_NAME}
 export DATA_DIR=/scratch1/ilya/locDoc/data/tfdf

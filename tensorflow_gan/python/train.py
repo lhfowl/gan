@@ -708,6 +708,8 @@ def gan_loss(
     aux_mhinge_cond_discriminator_weight=flags.FLAGS.aux_mhinge_cond_discriminator_weight,
     kplusone_mhinge_cond_discriminator_weight=flags.FLAGS.kplusone_mhinge_cond_discriminator_weight,
     kplusone_mhinge_ssl_cond_discriminator_weight=flags.FLAGS.kplusone_mhinge_ssl_cond_discriminator_weight,
+    kplusone_nll_discriminator_weight=flags.FLAGS.kplusone_nll_discriminator_weight,
+    kplusonegan_confuse_generator_weight=flags.FLAGS.kplusonegan_confuse_generator_weight,
     tensor_pool_fn=None,
     # Options.
     reduction=tf.compat.v1.losses.Reduction.SUM_BY_NONZERO_WEIGHTS,
@@ -778,6 +780,10 @@ def gan_loss(
       kplusone_mhinge_cond_discriminator_weight, 'kplusone_mhinge_cond_discriminator_weight')
   kplusone_mhinge_ssl_cond_discriminator_weight = _validate_aux_loss_weight(
       kplusone_mhinge_ssl_cond_discriminator_weight, 'kplusone_mhinge_ssl_cond_discriminator_weight')
+  kplusone_nll_discriminator_weight = _validate_aux_loss_weight(
+      kplusone_nll_discriminator_weight, 'kplusone_nll_discriminator_weight')
+  kplusonegan_confuse_generator_weight = _validate_aux_loss_weight(
+      kplusonegan_confuse_generator_weight, 'kplusonegan_confuse_generator_weight')
 
   # Verify configuration for mutual information penalty
   if (_use_aux_loss(mutual_information_penalty_weight) and
@@ -791,7 +797,9 @@ def gan_loss(
        _use_aux_loss(aux_cond_discriminator_weight) or
        _use_aux_loss(aux_mhinge_cond_generator_weight) or
        _use_aux_loss(aux_mhinge_cond_discriminator_weight) or
-       _use_aux_loss(kplusone_mhinge_cond_discriminator_weight)) and
+       _use_aux_loss(kplusone_mhinge_cond_discriminator_weight) or
+       _use_aux_loss(kplusone_nll_discriminator_weight) or
+       _use_aux_loss(kplusonegan_confuse_generator_weight)) and
       not (isinstance(model, namedtuples.ACGANModel) or isinstance(model, namedtuples.SSLACGANModel))):
     raise ValueError(
         'When `(aux|kplusone)_(mhinge_)cond_(generator|discriminator)_weight` '
@@ -875,6 +883,17 @@ def gan_loss(
     kplusone_disc_loss = tuple_losses.multihingegan_ssl_discriminator_loss(
         pooled_model, reduction=reduction, add_summaries=add_summaries)
     dis_loss += kplusone_mhinge_ssl_cond_discriminator_weight * kplusone_disc_loss
+  # nll
+  if _use_aux_loss(kplusone_nll_discriminator_weight):
+    kplusone_disc_loss = tuple_losses.kplusonegan_nll_discriminator_loss(
+        pooled_model, reduction=reduction, add_summaries=add_summaries)
+    dis_loss += kplusone_nll_discriminator_weight * kplusone_disc_loss
+  # confuse
+  if _use_aux_loss(kplusonegan_confuse_generator_weight):
+    confuse_gen_loss = tuple_losses.kplusonegan_confuse_generator_loss(
+        model, reduction=reduction, add_summaries=add_summaries)
+    gen_loss += kplusonegan_confuse_generator_weight * confuse_gen_loss
+    
   # Gathers auxiliary losses.
   if model.generator_scope:
     gen_reg_loss = tf.compat.v1.losses.get_regularization_loss(

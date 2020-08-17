@@ -69,9 +69,12 @@ def get_run_config_from_hparams(hparams):
 
 def get_tpu_estimator(generator, discriminator, hparams, config):
   gen_losses = {
-    'kplusone_wasserstein_generator_loss' :tuple_losses.kplusone_wasserstein_generator_loss,
-    'kplusone_featurematching_generator_loss' :tuple_losses.kplusone_featurematching_generator_loss,
-    'kplusone_ssl_featurematching_generator_loss' :tuple_losses.kplusone_ssl_featurematching_generator_loss
+    'kplusone_wasserstein_generator_loss': tuple_losses.kplusone_wasserstein_generator_loss,
+    'kplusone_featurematching_generator_loss': tuple_losses.kplusone_featurematching_generator_loss,
+    'kplusone_ssl_featurematching_generator_loss': tuple_losses.kplusone_ssl_featurematching_generator_loss,
+    'kplusonegan_activationmaxizaion_generator_loss': tuple_losses.kplusonegan_activationmaxizaion_generator_loss,
+    'kplusonegan_pll_generator_loss': tuple_losses.kplusonegan_pll_generator_loss,
+    'kplusonegan_csc_generator_loss': tuple_losses.kplusonegan_csc_generator_loss,
   }
   if flags.FLAGS.generator_loss_fn is not None:
     generator_loss_fn = gen_losses[flags.FLAGS.generator_loss_fn]
@@ -128,9 +131,12 @@ def get_gpu_estimator(generator, discriminator, hparams, config):
     return metrics
     
   gen_losses = {
-    'kplusone_wasserstein_generator_loss' :tuple_losses.kplusone_wasserstein_generator_loss,
-    'kplusone_featurematching_generator_loss' :tuple_losses.kplusone_featurematching_generator_loss,
-    'kplusone_ssl_featurematching_generator_loss' :tuple_losses.kplusone_ssl_featurematching_generator_loss
+    'kplusone_wasserstein_generator_loss': tuple_losses.kplusone_wasserstein_generator_loss,
+    'kplusone_featurematching_generator_loss': tuple_losses.kplusone_featurematching_generator_loss,
+    'kplusone_ssl_featurematching_generator_loss': tuple_losses.kplusone_ssl_featurematching_generator_loss,
+    'kplusonegan_activationmaxizaion_generator_loss': tuple_losses.kplusonegan_activationmaxizaion_generator_loss,
+    'kplusonegan_pll_generator_loss': tuple_losses.kplusonegan_pll_generator_loss,
+    'kplusonegan_csc_generator_loss': tuple_losses.kplusonegan_csc_generator_loss,
   }
   if flags.FLAGS.generator_loss_fn is not None:
     generator_loss_fn = gen_losses[flags.FLAGS.generator_loss_fn]

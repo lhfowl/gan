@@ -60,6 +60,9 @@ flags.DEFINE_enum(
     'Mode to run in. `train` just trains the model. `continuous_eval` '
     'continuously looks for new checkpoints and computes eval metrics and '
     'writes sample outputs to disk. `train_and_eval` does both. '
+    'gen_images will generate images from the GAN with one tile per class '
+    'unless gen_images_uniform_random_labels=True, then images will have '
+    'classes randomly uniformly sampled. '
     'If not set, will deduce mode from the TF_CONFIG environment variable.')
 flags.DEFINE_integer('max_number_of_steps', 50000,
                      'The maximum number of train steps.')
@@ -116,12 +119,17 @@ flags.DEFINE_float('aux_cond_discriminator_weight', None,
 flags.DEFINE_float('aux_mhinge_cond_generator_weight', None,
                    'How to scale generator Multi-Hinge GAN loss relative to WGAN loss, default is None.')
 flags.DEFINE_float('aux_mhinge_cond_discriminator_weight', None, 
-                   'How to scale generator Multi-Hinge GAN loss relative to WGAN loss, default is None., default is None.')
+                   'How to scale discriminator Multi-Hinge GAN loss, default is None., default is None.')
 flags.DEFINE_enum(
     'critic_type', 'acgan', ['acgan', 'kplusone_fm', 'kplusone_wgan', 'acgan_noproj', 'acgan_multiproj'],
     'Use this oprtion to switch between architectures for D and G.')
 flags.DEFINE_float('kplusone_mhinge_cond_discriminator_weight', None, 
                    'When using a K+1 GAN, how to scale the MHingeGAN loss. Default is None.')
+flags.DEFINE_float('kplusone_nll_discriminator_weight', None, 
+                   'When using a K+1 GAN, how to scale the NLL loss. Default is None.')
+flags.DEFINE_float('kplusonegan_confuse_generator_weight', None, 
+                   'When using a K+1 GAN, how to scale the Confuse loss. Default is None. Try 1.0')
+
 # unlabelled data
 flags.DEFINE_string('unlabelled_dataset_name', None,
                     'If set use unlabelled data.')
@@ -130,18 +138,19 @@ flags.DEFINE_string('unlabelled_dataset_split_name', 'unlabelled',
 flags.DEFINE_float('kplusone_mhinge_ssl_cond_discriminator_weight', None, 
                    'When using a K+1 GAN in a SSL setting, how to scale the MHingeGAN loss. Default is None.')
 flags.DEFINE_enum(
-    'generator_loss_fn', None, ['kplusone_wasserstein_generator_loss', 'kplusone_featurematching_generator_loss', 'kplusone_ssl_featurematching_generator_loss'],
+    'generator_loss_fn', None, ['kplusone_wasserstein_generator_loss', 'kplusone_featurematching_generator_loss', 'kplusone_ssl_featurematching_generator_loss', 'kplusonegan_activationmaxizaion_generator_loss', 'kplusonegan_pll_generator_loss', 'kplusonegan_csc_generator_loss'],
     'Use this arg when you are not using an ACGAN to override the generator loss. Used for K+1 GANS.')
 flags.DEFINE_integer( 'tpu_gan_estimator_d_step', 1, 'For TPU execution only, control number of discriminator steps. This feature is unsupported on GPU.')
 flags.DEFINE_integer( 'tpu_gan_estimator_g_step', 1, 'For TPU execution only, control number of discriminator steps. This feature is unsupported on GPU.')
 flags.DEFINE_float('generator_margin_size', 1.0, 'Used in achingegan_generator_loss.')
 flags.DEFINE_integer( 'intra_fid_eval_chunk_size', None, 'The number of classes for which to compute a FID score within the class. This allows processing batches of FID scores in parallel for speed improvements.')
 flags.DEFINE_integer( 'tfdf_num_parallel_calls', 16, '...')
-flags.DEFINE_integer( 'n_images_per_side_to_gen_per_class', None, 'When exporting images, this is the number of images per side of the square exported. This is useful when exporting a collage of images per class. It should be set to the square root of the eval batch size.')
+flags.DEFINE_integer( 'n_images_per_side_to_gen_per_tile', None, 'When exporting images, this is the number of images per side of the square exported. This is useful when exporting a collage of images per class. It should be set to the square root of the eval batch size.')
 flags.DEFINE_bool('gen_images_with_margins', False, 'When exporting images per class, if this option is true the images will be sorted by the size of their classification margin.')
 flags.DEFINE_bool('extra_eval_metrics', False, 'Perform extra eval metrics like accuracy.')
 flags.DEFINE_integer( 'keep_checkpoint_max', 5, 'Number of most recent checkpoints to keep. Others will be deleted.')
-
+flags.DEFINE_float('generator_confuse_margin_size', 0.1, 'Used in kplusonegan_confuse_generator_loss.')
+flags.DEFINE_bool('gen_images_uniform_random_labels', False, 'If mode is gen_images, do not do it classwise if this is true.')
 
 
 FLAGS = flags.FLAGS

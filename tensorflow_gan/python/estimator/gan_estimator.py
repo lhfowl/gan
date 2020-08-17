@@ -246,7 +246,7 @@ def get_gan_model(mode,
   """Makes the GANModel tuple, which encapsulates the GAN model architecture."""
   if mode == tf.estimator.ModeKeys.PREDICT and flags.FLAGS.gen_images_with_margins:
     # need this because we load the discrinimator
-    side = flags.FLAGS.n_images_per_side_to_gen_per_class
+    side = flags.FLAGS.n_images_per_side_to_gen_per_tile
     bs = side*side
     fake_imgs = tf.zeros([bs, flags.FLAGS.image_size, flags.FLAGS.image_size, 3])
     fake_lbls = tf.zeros([bs], dtype=tf.int32)

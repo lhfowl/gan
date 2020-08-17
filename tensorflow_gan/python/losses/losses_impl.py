@@ -63,7 +63,9 @@ __all__ = [
     'combine_adversarial_loss',
     'cycle_consistency_loss',
     'kplusone_wasserstein_generator_loss',
-    'kplusone_featurematching_generator_loss'
+    'kplusone_featurematching_generator_loss',
+    'kplusonegan_nll_discriminator_loss',
+    'kplusonegan_confuse_generator_loss'
 ]
 
 
@@ -354,6 +356,8 @@ def acgan_discriminator_loss(
     reduction=tf.compat.v1.losses.Reduction.SUM_BY_NONZERO_WEIGHTS,
     add_summaries=False):
   """ACGAN loss for the discriminator.
+  
+  Don't use this with K+1 gans.
 
   The ACGAN loss adds a classification loss to the conditional discriminator.
   Therefore, the discriminator must output a tuple consisting of
@@ -390,6 +394,8 @@ def acgan_discriminator_loss(
   Raises:
     TypeError: If the discriminator does not output a tuple.
   """
+  
+  
   one_hot_labels_real = one_hot_labels[:,:flags.FLAGS.num_classes]
   one_hot_labels_gen = one_hot_labels[:,flags.FLAGS.num_classes:]
   with tf.compat.v1.name_scope(
@@ -961,10 +967,350 @@ def kplusone_wasserstein_generator_loss(
 def no_loss(*args, **kwargs):
   return 0
 
+def kplusonegan_nll_discriminator_loss(
+    discriminator_real_classification_logits,
+    discriminator_gen_classification_logits,
+    one_hot_labels,
+    label_smoothing=0.0,
+    real_weights=1.0,
+    generated_weights=1.0,
+    scope=None,
+    loss_collection=tf.compat.v1.GraphKeys.LOSSES,
+    reduction=tf.compat.v1.losses.Reduction.SUM_BY_NONZERO_WEIGHTS,
+    add_summaries=False):
+  """K+1 GAN nll loss for the discriminator.
+  
+  Use this only with K+1 gans.
+  NLL loss for the correct class for real, and the K+1 class for fake.
+
+  ...
+
+  Args:
+    discriminator_real_classification_logits: Classification logits for real
+      data.
+    discriminator_gen_classification_logits: Classification logits for generated
+      data.
+    one_hot_labels: A Tensor holding one-hot labels for the batch.
+    label_smoothing: A float in [0, 1]. If greater than 0, smooth the labels for
+      "discriminator on real data" as suggested in
+      https://arxiv.org/pdf/1701.00160
+    real_weights: Optional `Tensor` whose rank is either 0, or the same rank as
+      `discriminator_real_outputs`, and must be broadcastable to
+      `discriminator_real_outputs` (i.e., all dimensions must be either `1`, or
+      the same as the corresponding dimension).
+    generated_weights: Same as `real_weights`, but for
+      `discriminator_gen_classification_logits`.
+    scope: The scope for the operations performed in computing the loss.
+    loss_collection: collection to which this loss will be added.
+    reduction: A `tf.losses.Reduction` to apply to loss.
+    add_summaries: Whether or not to add summaries for the loss.
+
+  Returns:
+    A loss Tensor. Shape depends on `reduction`.
+
+  Raises:
+    TypeError: If the discriminator does not output a tuple.
+  """
+  k = flags.FLAGS.num_classes+1
+  one_hot_labels_real = one_hot_labels[:,:k]
+  
+  with tf.compat.v1.name_scope(
+      scope, 'kplusonegan_nll_discriminator_loss',
+      (discriminator_real_classification_logits,
+       discriminator_gen_classification_logits, one_hot_labels_real)) as scope:
+    # fake gets the fake class
+    one_hot_fake_class = tf.concat([tf.zeros_like(one_hot_labels_real[:,:(k-1)]), tf.ones_like(one_hot_labels_real[:,(k-1):k])], axis=1)
+    loss_on_generated = tf.compat.v1.losses.softmax_cross_entropy(
+        one_hot_fake_class,
+        discriminator_gen_classification_logits,
+        weights=generated_weights,
+        scope=scope,
+        loss_collection=None,
+        reduction=reduction)
+    # real gets the correct class
+    loss_on_real = tf.compat.v1.losses.softmax_cross_entropy(
+        one_hot_labels_real,
+        discriminator_real_classification_logits,
+        weights=real_weights,
+        label_smoothing=label_smoothing,
+        scope=scope,
+        loss_collection=None,
+        reduction=reduction)
+    loss = loss_on_generated + loss_on_real
+    tf.compat.v1.losses.add_loss(loss, loss_collection)
+
+    if add_summaries:
+      tf.compat.v1.summary.scalar('discriminator_gen_nll_loss',
+                                  loss_on_generated)
+      tf.compat.v1.summary.scalar('discriminator_real_nll_loss', loss_on_real)
+      tf.compat.v1.summary.scalar('discriminator_nll_loss', loss)
+
+  return loss
+
+def kplusonegan_activationmaxizaion_generator_loss(
+    discriminator_gen_classification_logits,
+    one_hot_labels,
+    weights=1.0,
+    scope=None,
+    loss_collection=tf.compat.v1.GraphKeys.LOSSES,
+    reduction=tf.compat.v1.losses.Reduction.SUM_BY_NONZERO_WEIGHTS,
+    add_summaries=False):
+  """
+  Activation maximization loss for a generator trained with kplusone classifier.
+
+
+  For more details:
+    AMGAN: https://openreview.net/forum?id=HyyP33gAZ
+    MHGAN: https://arxiv.org/abs/1912.04216
+
+  Args:
+    discriminator_gen_classification_logits: Classification logits for generated
+      data.
+    one_hot_labels: A Tensor holding one-hot labels for the batch.
+    weights: Optional `Tensor` whose rank is either 0, or the same rank as
+      `discriminator_gen_classification_logits`, and must be broadcastable to
+      `discriminator_gen_classification_logits` (i.e., all dimensions must be
+      either `1`, or the same as the corresponding dimension).
+    scope: The scope for the operations performed in computing the loss.
+    loss_collection: collection to which this loss will be added.
+    reduction: A `tf.losses.Reduction` to apply to loss.
+    add_summaries: Whether or not to add summaries for the loss.
+
+  Returns:
+    A loss Tensor. Shape depends on `reduction`.
+
+  Raises:
+    ValueError: if arg module not either `generator` or `discriminator`
+    TypeError: if the discriminator does not output a tuple.
+  """
+  k = flags.FLAGS.num_classes+1
+  one_hot_labels = one_hot_labels[:,k:] # only used for their shape
+  with tf.compat.v1.name_scope(
+      scope, 'kplusonegan_activationmaxizaion_generator_loss',
+      (discriminator_gen_classification_logits, one_hot_labels)) as scope:
+    
+    discriminator_gen_classification_probas = tf.nn.softmax(discriminator_gen_classification_logits)
+    one_hot_fake_class = tf.concat([tf.zeros_like(one_hot_labels[:,:(k-1)]), tf.ones_like(one_hot_labels[:,(k-1):k])], axis=1)
+    not_fake_gen = tf.boolean_mask(discriminator_gen_classification_probas, tf.cast(1-one_hot_fake_class, dtype=tf.bool))
+    not_fake_gen = tf.reshape(not_fake_gen, (-1, k-1))
+    max_real_gen_nll = -tf.math.log(tf.reduce_max(not_fake_gen, axis=1))
+    
+    # Average.
+    loss = tf.compat.v1.losses.compute_weighted_loss(
+        max_real_gen_nll,
+        weights,
+        scope,
+        loss_collection=loss_collection,
+        reduction=reduction)
+
+    if add_summaries:
+      tf.compat.v1.summary.scalar('generator_activationmaximization_loss', loss)
+
+  return loss
+  
+def kplusonegan_pll_generator_loss(
+    discriminator_gen_classification_logits,
+    one_hot_labels,
+    weights=1.0,
+    scope=None,
+    loss_collection=tf.compat.v1.GraphKeys.LOSSES,
+    reduction=tf.compat.v1.losses.Reduction.SUM_BY_NONZERO_WEIGHTS,
+    add_summaries=False):
+  """
+  Positive log likelihood loss for a generator trained with kplusone classifier.
+
+  In nll the nll of the correct class is minimized. Here in pll the nll of the
+  incorrect class is maximized, i.e. pll is minimized.
+
+  For more details:
+    MHGAN: https://arxiv.org/abs/1912.04216
+
+  Args:
+    discriminator_gen_classification_logits: Classification logits for generated
+      data.
+    one_hot_labels: A Tensor holding one-hot labels for the batch.
+    weights: Optional `Tensor` whose rank is either 0, or the same rank as
+      `discriminator_gen_classification_logits`, and must be broadcastable to
+      `discriminator_gen_classification_logits` (i.e., all dimensions must be
+      either `1`, or the same as the corresponding dimension).
+    scope: The scope for the operations performed in computing the loss.
+    loss_collection: collection to which this loss will be added.
+    reduction: A `tf.losses.Reduction` to apply to loss.
+    add_summaries: Whether or not to add summaries for the loss.
+
+  Returns:
+    A loss Tensor. Shape depends on `reduction`.
+
+  Raises:
+    ValueError: if arg module not either `generator` or `discriminator`
+    TypeError: if the discriminator does not output a tuple.
+  """
+  k = flags.FLAGS.num_classes+1
+  one_hot_labels = one_hot_labels[:,k:] # only used for their shape
+  with tf.compat.v1.name_scope(
+      scope, 'kplusonegan_pll_generator_loss',
+      (discriminator_gen_classification_logits, one_hot_labels)) as scope:
+    
+    discriminator_gen_classification_probas = tf.nn.softmax(discriminator_gen_classification_logits)
+    one_hot_fake_class = tf.concat([tf.zeros_like(one_hot_labels[:,:(k-1)]), tf.ones_like(one_hot_labels[:,(k-1):k])], axis=1)
+    is_fake_gen = tf.boolean_mask(discriminator_gen_classification_probas, tf.cast(one_hot_fake_class, dtype=tf.bool))
+    is_fake_ll = tf.math.log(is_fake_gen)
+    
+    # Average.
+    loss = tf.compat.v1.losses.compute_weighted_loss(
+        is_fake_ll,
+        weights,
+        scope,
+        loss_collection=loss_collection,
+        reduction=reduction)
+
+    if add_summaries:
+      tf.compat.v1.summary.scalar('generator_pll_loss', loss)
+
+  return loss
+
+def kplusonegan_csc_generator_loss(
+    discriminator_gen_classification_logits,
+    one_hot_labels,
+    weights=1.0,
+    scope=None,
+    loss_collection=tf.compat.v1.GraphKeys.LOSSES,
+    reduction=tf.compat.v1.losses.Reduction.SUM_BY_NONZERO_WEIGHTS,
+    add_summaries=False):
+  """
+  Complement Crammer-Singer (CSC) loss for a generator trained with kplusone classifier.
+
+  For more details:
+    MHingeGAN: https://arxiv.org/abs/1912.04216
+
+  Args:
+    discriminator_gen_classification_logits: Classification logits for generated
+      data.
+    one_hot_labels: A Tensor holding one-hot labels for the batch.
+    weights: Optional `Tensor` whose rank is either 0, or the same rank as
+      `discriminator_gen_classification_logits`, and must be broadcastable to
+      `discriminator_gen_classification_logits` (i.e., all dimensions must be
+      either `1`, or the same as the corresponding dimension).
+    scope: The scope for the operations performed in computing the loss.
+    loss_collection: collection to which this loss will be added.
+    reduction: A `tf.losses.Reduction` to apply to loss.
+    add_summaries: Whether or not to add summaries for the loss.
+
+  Returns:
+    A loss Tensor. Shape depends on `reduction`.
+
+  Raises:
+    ValueError: if arg module not either `generator` or `discriminator`
+    TypeError: if the discriminator does not output a tuple.
+  """
+  margin = flags.FLAGS.generator_margin_size
+  k = flags.FLAGS.num_classes+1
+  one_hot_labels = one_hot_labels[:,k:] # only used for shape
+  with tf.compat.v1.name_scope(
+      scope, 'kplusonegan_csc_generator_loss',
+      (discriminator_gen_classification_logits, one_hot_labels)) as scope:
+    
+    one_hot_fake_class = tf.concat([tf.zeros_like(one_hot_labels[:,:(k-1)]), tf.ones_like(one_hot_labels[:,(k-1):k])], axis=1)
+    # target = tf.reduce_sum(discriminator_gen_classification_logits * one_hot_fake_class, axis=1, keepdims=True)
+    target = discriminator_gen_classification_logits[:,(k-1):k]
+    hinged = tf.reduce_max((margin - discriminator_gen_classification_logits + target) * (1-one_hot_fake_class), axis=1)
+
+    # Average.
+    loss = tf.compat.v1.losses.compute_weighted_loss(
+        hinged,
+        weights,
+        scope,
+        loss_collection=loss_collection,
+        reduction=reduction)
+
+    if add_summaries:
+      tf.compat.v1.summary.scalar('generator_csc_loss', loss)
+
+  return loss
+
+def kplusonegan_confuse_generator_loss(
+    discriminator_gen_classification_logits,
+    weights=1.0,
+    scope=None,
+    loss_collection=tf.compat.v1.GraphKeys.LOSSES,
+    reduction=tf.compat.v1.losses.Reduction.SUM_BY_NONZERO_WEIGHTS,
+    add_summaries=False):
+  """
+  Loss for a generator trained with kplusone classifier.
+  
+  An auxiliary loss to be used with kplusonegan_csc_generator_loss for eg.
+  
+  For more details:
+    MaryGAN: ...
+  
+  An explanation of the implementation:
+  
+  We want to subtract the maximum likely and the second maximum likely
+  classes. Because we can't sort or use any operation with a dynamic boolean,
+  what we do is this: rem = max_logit - logits_arr, we want the smallest non-zero
+  value in this array. Observe that there are n_classes number of binary masks
+  that have 1 'infinity' and n_classes-1 'zeros'. Apply one such mask to rem, note
+  that the minimum is always zero unless the 'infinity' is in the position of the
+  value we want to exclude (the zero). We may apply all the masks and
+  take the minimum each time, and we will be left with n_classes-1 'zeros' and
+  1 non-zero element. Adding these together we get the number we want, the
+  smallest non-zero element.
+
+  Args:
+    discriminator_gen_classification_logits: Classification logits for generated
+      data.
+    one_hot_labels: A Tensor holding one-hot labels for the batch.
+    weights: Optional `Tensor` whose rank is either 0, or the same rank as
+      `discriminator_gen_classification_logits`, and must be broadcastable to
+      `discriminator_gen_classification_logits` (i.e., all dimensions must be
+      either `1`, or the same as the corresponding dimension).
+    scope: The scope for the operations performed in computing the loss.
+    loss_collection: collection to which this loss will be added.
+    reduction: A `tf.losses.Reduction` to apply to loss.
+    add_summaries: Whether or not to add summaries for the loss.
+
+  Returns:
+    A loss Tensor. Shape depends on `reduction`.
+
+  Raises:
+    ValueError: if arg module not either `generator` or `discriminator`
+    TypeError: if the discriminator does not output a tuple.
+  """
+  confuse_margin = flags.FLAGS.generator_confuse_margin_size
+  big_number = 10000.0
+  k = flags.FLAGS.num_classes+1
+  with tf.compat.v1.name_scope(
+      scope, 'kplusonegan_confuse_generator_loss',
+      (discriminator_gen_classification_logits,)) as scope:
+    
+    real_logits = discriminator_gen_classification_logits[:,:(k-1)]
+    
+    max_logit = tf.reduce_max(real_logits, axis=1, keepdims=True)
+    rem = -real_logits + max_logit
+    rem = tf.expand_dims(rem, axis=1)
+    rem = tf.tile(rem, (1,k-1,1))
+    all_masks = big_number * tf.eye(k-1)
+    smallest_dist = tf.reduce_sum(tf.reduce_min(rem+all_masks, axis=2), axis=1, keepdims=True)
+    zeros = tf.zeros_like(real_logits[:,:1])
+    hinged = tf.math.maximum(zeros, smallest_dist - confuse_margin)
+
+    # Average.
+    loss = tf.compat.v1.losses.compute_weighted_loss(
+        hinged,
+        weights,
+        scope,
+        loss_collection=loss_collection,
+        reduction=reduction)
+
+    if add_summaries:
+      tf.compat.v1.summary.scalar('generator_confuse_loss', loss)
+
+  return loss  
+
+
+
 # Wasserstein Gradient Penalty losses from `Improved Training of Wasserstein
 # GANs` (https://arxiv.org/abs/1704.00028).
-
-
 def wasserstein_gradient_penalty(
     real_data,
     generated_data,

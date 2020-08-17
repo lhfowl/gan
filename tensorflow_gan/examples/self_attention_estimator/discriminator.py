@@ -103,6 +103,7 @@ def discriminator_32_kplusone_wgan(image, labels, df_dim, number_classes, act=tf
     - A `Tensor` representing the logits of the discriminator.
     - A list containing all trainable varaibles defined by the model.
   """
+  del labels
   with tf.compat.v1.variable_scope(
       'discriminator', reuse=tf.compat.v1.AUTO_REUSE) as dis_scope:
     h0 = optimized_block(
@@ -138,6 +139,7 @@ def discriminator_32_kplusone_fm(image, labels, df_dim, number_classes, act=tf.n
     - A `Tensor` representing the logits of the discriminator.
     - A list containing all trainable varaibles defined by the model.
   """
+  del labels
   with tf.compat.v1.variable_scope(
       'discriminator', reuse=tf.compat.v1.AUTO_REUSE) as dis_scope:
     h0 = optimized_block(
@@ -174,6 +176,7 @@ def discriminator_64_kplusone_fm(image, labels, df_dim, number_classes, act=tf.n
     - A `Tensor` representing the logits of the discriminator.
     - A list containing all trainable varaibles defined by the model.
   """
+  del labels
   with tf.compat.v1.variable_scope(
       'discriminator', reuse=tf.compat.v1.AUTO_REUSE) as dis_scope:
     h0 = optimized_block(
@@ -210,6 +213,7 @@ def discriminator_128_kplusone_fm(image, labels, df_dim, number_classes, act=tf.
     - A `Tensor` representing the logits of the discriminator.
     - A list containing all trainable varaibles defined by the model.
   """
+  del labels
   with tf.compat.v1.variable_scope(
       'discriminator', reuse=tf.compat.v1.AUTO_REUSE) as dis_scope:
     h0 = optimized_block(
