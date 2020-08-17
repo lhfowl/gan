@@ -43,7 +43,7 @@ Because of the design choices everything outside of the SAGAN example, including
 
 [Downloads root is here](https://drive.google.com/drive/folders/1SZeCaPrEqRYXUyhWi_BLEEpiJFdtpX1B?usp=sharing)
 
-Note: in some cases multiple checkpoints of weights are given. To control which weights are loaded exit the number in txt 'checkpoint' file in each model directory.
+Note: in some cases multiple checkpoints of weights are given. To control which weights are loaded edit the number in txt 'checkpoint' file in each model directory.
 
 Note: to run eval you need the original dataset.
 
@@ -70,7 +70,8 @@ Note: to run eval you need the original dataset.
     - step 580000 has IS 47.79 and FID 17.10
     - step 585000 has IS 169.68 and FID 8.87 but very low diversity    
     - used in `/gan/tensorflow_gan/examples/gpu/example_lowdiversity_genimages_imagenet128.sh`
-    - 64000 images sampled from each of these models are [available here](https://drive.google.com/drive/folders/19YD6otbzJv1QbO-jB9tQKdDt1Vrp8YGb?usp=sharing)
+    - 64000 images (class is random) sampled from each of these models are [available here as tarball](https://drive.google.com/drive/folders/1OKMHYQSZCNHQBsmNCmU3xLFx-Y42NfYC?usp=sharing)
+    - [Browser viewable images here](https://drive.google.com/drive/folders/1iN7io65N7QzkiXYx079SRWr4naOCHbHU?usp=sharing) of 36 images per class from each of these models.
 
 ## Performance on Imagenet128
 
@@ -107,8 +108,6 @@ To run a small experiment, see for example:
 - `/gan/tensorflow_gan/examples/tpu/cifar100.sh`
 
 Such an experiment takes only an hour to get to 200k on a v3-8 TPU.
-
-### How to run eval on pretrained models
 
 ## Installation GPU
 
