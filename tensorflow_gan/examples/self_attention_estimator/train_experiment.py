@@ -93,7 +93,7 @@ def _verify_dataset_shape(ds, z_dim):
 
 def train_eval_input_fn(mode, params, restrict_classes=None, shift_classes=0):
   """Mode-aware input function.
-  
+
   restrict_classes: for use with intra fid
   shift_classes: for use with restrict_classes
   """
@@ -136,40 +136,41 @@ def train_eval_input_fn(mode, params, restrict_classes=None, shift_classes=0):
       shuffle_buffer_size=params['shuffle_buffer_size'],
       split=split,
       restrict_classes=restrict_classes)
-  
+
   if flags.FLAGS.unlabelled_dataset_name is not None:
     unl_images_ds = data_provider_unlabelled.provide_dataset(
         bs,
         shuffle_buffer_size=params['shuffle_buffer_size'],
         split=flags.FLAGS.unlabelled_dataset_split_name)
-    
+
     images_ds = tf.data.Dataset.zip((images_ds, unl_images_ds))
     images_ds = images_ds.map( lambda img_lab_tup, unl_img: {'images': img_lab_tup[0], 'labels': img_lab_tup[1], 'unlabelled_images': unl_img})  # map to dict.
   else:
     images_ds = images_ds.map(lambda img, lbl: {'images': img, 'labels': lbl})  # map to dict.
-    
-  
+
+
   ds = tf.data.Dataset.zip((noise_ds, images_ds))
   if restrict_classes is not None or flags.FLAGS.mode == 'intra_fid_eval':
     ds = ds.map(lambda noise_ds, images_ds: ({'z': noise_ds, 'labels': images_ds['labels']-shift_classes}, {'images': images_ds['images'], 'labels': images_ds['labels']-shift_classes}) )
   elif flags.FLAGS.mode == 'gen_images':
-    
+
     def _make_labels_for_class(y):
       return gen_module.make_one_batch_constant_labels(bs, y)
-    labels_todo = list(range(flags.FLAGS.num_classes))
+    labels_todo = [0]
+    #labels_todo = list(range(flags.FLAGS.num_classes))
     # hack to print your favorite classes
     # labels_todo = list(sorted([130,96,90,88,164,175,281,289,290,292,294,323,441,475,555,581,607,654,661,663,688,779] * 5))
-    
+
     # okay, this is a ugly papercut, but an easy one-line modification of the above
     def _make_one_batch_unif_random_labels(index):
       del index
       return gen_module.make_class_labels(bs, flags.FLAGS.num_classes)
-    
+
     if flags.FLAGS.gen_images_uniform_random_labels:
       labs_ds = tf.data.Dataset.from_tensor_slices(labels_todo).repeat().map(_make_one_batch_unif_random_labels)
     else:
       labs_ds = tf.data.Dataset.from_tensor_slices(labels_todo).repeat().map(_make_labels_for_class)
-    
+
     ds = tf.data.Dataset.zip((noise_ds, images_ds, labs_ds))
     ds = ds.map(lambda noise_ds_, images_ds_, labs_ds_: {'z': noise_ds_, 'labels': labs_ds_} ) # fake data only
     # ds = ds.map(lambda noise_ds_, images_ds_, labs_ds_: ({'z': noise_ds_, 'labels': labs_ds_}, images_ds_) )
@@ -210,11 +211,11 @@ def run_train(hparams):
 def gen_images(hparams):
   """..."""
   tf.compat.v1.logging.info('Generating Images.')
-  
+
   # modified body of make_estimator(hparams)
   discriminator = _get_discriminator(hparams)
   generator = _get_generator_to_be_conditioned(hparams)
-  
+
 
   if hparams.tpu_params.use_tpu_estimator:
     config = est_lib.get_tpu_run_config_from_hparams(hparams)
@@ -222,7 +223,7 @@ def gen_images(hparams):
   else:
     config = est_lib.get_run_config_from_hparams(hparams)
     estimator = est_lib.get_gpu_estimator(generator, discriminator, hparams, config)
-  
+
   # tf.compat.v1.logging.info('Counting params...')
   # total_parameters = 0
   # for variable in estimator.get_variable_names():
@@ -231,7 +232,7 @@ def gen_images(hparams):
   #   total_parameters += int(nparam)
   # tf.compat.v1.logging.info('Found %i params.' % total_parameters)
   # print(total_parameters)
-  
+
   ckpt_str =  evaluation.latest_checkpoint(hparams.model_dir)
   tf.compat.v1.logging.info('Evaluating checkpoint: %s' % ckpt_str)
 
@@ -241,11 +242,11 @@ def gen_images(hparams):
     cur_step = 0
   eval_lib.predict_and_write_images(estimator, train_eval_input_fn,
                                         hparams.model_dir, 'step_%i' % cur_step)
-                                        
+
 def gen_matrices(hparams):
   """..."""
   tf.compat.v1.logging.info('Generating Matrices.')
-  
+
   # modified body of make_estimator(hparams)
   discriminator = _get_discriminator(hparams)
   generator = _get_generator_to_be_conditioned(hparams)
@@ -256,10 +257,10 @@ def gen_matrices(hparams):
   else:
     config = est_lib.get_run_config_from_hparams(hparams)
     estimator = est_lib.get_gpu_estimator(generator, discriminator, hparams, config)
-  
+
   ckpt_str =  evaluation.latest_checkpoint(hparams.model_dir)
   tf.compat.v1.logging.info('Evaluating checkpoint: %s' % ckpt_str)
-  
+
   # saving matrices
   save_dir = os.environ['HOME'] if flags.FLAGS.use_tpu else hparams.model_dir
   embedding_map = estimator.get_variable_value('Discriminator/discriminator/d_embedding/embedding_map')
@@ -268,14 +269,14 @@ def gen_matrices(hparams):
   if class_kernel in estimator.get_variable_names():
     classification_map = estimator.get_variable_value(class_kernel)
     np.save('%s/classification_map_step_%s.npy' % (save_dir, ckpt_str.split('-')[-1]), classification_map)
-  
+
 
 
 
 def run_intra_fid_eval(hparams):
   """..."""
   tf.compat.v1.logging.info('Intra FID evaluation.')
-  
+
   # modified body of make_estimator(hparams)
   generator = _get_generator_to_be_conditioned(hparams)
   discriminator = _get_discriminator(hparams)
@@ -286,8 +287,8 @@ def run_intra_fid_eval(hparams):
   else:
     config = est_lib.get_run_config_from_hparams(hparams)
     estimator = est_lib.get_gpu_estimator(generator, discriminator, hparams, config)
-  
-  
+
+
   ckpt_str =  evaluation.latest_checkpoint(hparams.model_dir)
   tf.compat.v1.logging.info('Evaluating checkpoint: %s' % ckpt_str)
   chunk_sz = flags.FLAGS.intra_fid_eval_chunk_size
@@ -458,7 +459,7 @@ def _get_discriminator(hparams):
       class_logits = tf.zeros(
           [tf.shape(input=images)[0], 10]) * tf.compat.v1.get_variable(
               'dummy_d2', initializer=2.0) * tf.reduce_mean(input_tensor=images)
-      
+
       discriminator_vars = ()
     else:
       num_trainable_variables = len(tf.compat.v1.trainable_variables())
@@ -471,7 +472,7 @@ def _get_discriminator(hparams):
         eval_lib.log_and_summarize_variables(
             discriminator_vars, 'dvars', hparams.tpu_params.use_tpu_estimator)
     logits.shape.assert_is_compatible_with([None, None])
-    
+
     return logits, class_logits
 
   return discriminator
