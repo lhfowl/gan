@@ -31,11 +31,15 @@ from absl import flags
 import logging
 import os
 
+
 flags.DEFINE_string('model_dir', '/tmp/tfgan_logdir/sagan-estimator',
                     'Optional location to save model. If `None`, use a '
                     'default provided by tf.Estimator.')
-
-
+'''
+flags.DEFINE_string('model_dir', '/home/lfowl/Desktop/SAGAN/model_ckpts/imagenet128_baseline',
+                    'Optional location to save model. If `None`, use a '
+                    'default provided by tf.Estimator.')
+'''
 # ML Hparams.
 flags.DEFINE_integer(
     'train_batch_size', 32,
@@ -96,7 +100,7 @@ flags.DEFINE_integer(
     'tpu_iterations_per_loop', 1000,
     'Steps per interior TPU loop. Should be less than '
     '--train_steps_per_eval.')
-    
+
 # MHingeGAN
 flags.DEFINE_integer(
     'image_size', 32,
@@ -114,20 +118,20 @@ flags.DEFINE_string('dataset_name', 'imagenet2012',
                     'Which dataset to use. imagenet2012 is default.')
 flags.DEFINE_float('aux_cond_generator_weight', None,
                    'How to scale generator ACGAN loss relative to WGAN loss, default is None. Try 0.1')
-flags.DEFINE_float('aux_cond_discriminator_weight', None, 
+flags.DEFINE_float('aux_cond_discriminator_weight', None,
                    'How to scale the critic ACGAN loss relative to WGAN loss, default is None. Try 1.0')
 flags.DEFINE_float('aux_mhinge_cond_generator_weight', None,
                    'How to scale generator Multi-Hinge GAN loss relative to WGAN loss, default is None.')
-flags.DEFINE_float('aux_mhinge_cond_discriminator_weight', None, 
+flags.DEFINE_float('aux_mhinge_cond_discriminator_weight', None,
                    'How to scale discriminator Multi-Hinge GAN loss, default is None., default is None.')
 flags.DEFINE_enum(
     'critic_type', 'acgan', ['acgan', 'kplusone_fm', 'kplusone_wgan', 'acgan_noproj', 'acgan_multiproj'],
     'Use this oprtion to switch between architectures for D and G.')
-flags.DEFINE_float('kplusone_mhinge_cond_discriminator_weight', None, 
+flags.DEFINE_float('kplusone_mhinge_cond_discriminator_weight', None,
                    'When using a K+1 GAN, how to scale the MHingeGAN loss. Default is None.')
-flags.DEFINE_float('kplusone_nll_discriminator_weight', None, 
+flags.DEFINE_float('kplusone_nll_discriminator_weight', None,
                    'When using a K+1 GAN, how to scale the NLL loss. Default is None.')
-flags.DEFINE_float('kplusonegan_confuse_generator_weight', None, 
+flags.DEFINE_float('kplusonegan_confuse_generator_weight', None,
                    'When using a K+1 GAN, how to scale the Confuse loss. Default is None. Try 1.0')
 
 # unlabelled data
@@ -135,7 +139,7 @@ flags.DEFINE_string('unlabelled_dataset_name', None,
                     'If set use unlabelled data.')
 flags.DEFINE_string('unlabelled_dataset_split_name', 'unlabelled',
                     'The split in the tensorflowdatasets dataset to use as unlabelled.')
-flags.DEFINE_float('kplusone_mhinge_ssl_cond_discriminator_weight', None, 
+flags.DEFINE_float('kplusone_mhinge_ssl_cond_discriminator_weight', None,
                    'When using a K+1 GAN in a SSL setting, how to scale the MHingeGAN loss. Default is None.')
 flags.DEFINE_enum(
     'generator_loss_fn', None, ['kplusone_wasserstein_generator_loss', 'kplusone_featurematching_generator_loss', 'kplusone_ssl_featurematching_generator_loss', 'kplusonegan_activationmaxizaion_generator_loss', 'kplusonegan_pll_generator_loss', 'kplusonegan_csc_generator_loss'],
@@ -157,14 +161,14 @@ FLAGS = flags.FLAGS
 
 def main(_):
   from tensorflow_gan.examples.self_attention_estimator import train_experiment
-  
+
   # get TF logger
   log = logging.getLogger('tensorflow')
   log.setLevel(logging.INFO)
-  
+
   # create formatter and add it to the handlers
   formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-  
+
   # create file handler
   logging_dir = os.environ['HOME'] if FLAGS.use_tpu else FLAGS.model_dir
   if not os.path.isdir(logging_dir):
@@ -173,7 +177,7 @@ def main(_):
   fh.setLevel(logging.INFO)
   fh.setFormatter(formatter)
   log.addHandler(fh)
-    
+
   tpu_location = FLAGS.tpu
   if FLAGS.use_tpu:
     assert ',' not in tpu_location, 'Only using 1 TPU is supported'

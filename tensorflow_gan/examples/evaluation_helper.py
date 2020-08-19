@@ -320,7 +320,7 @@ def checkpoints_iterator(checkpoint_dir,
 
 def latest_checkpoint(checkpoint_dir):
   return wait_for_new_checkpoint(checkpoint_dir)
-  
+
 
 def evaluate_once(checkpoint_path,
                   master='',

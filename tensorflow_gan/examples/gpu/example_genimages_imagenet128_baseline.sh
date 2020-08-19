@@ -2,7 +2,7 @@
 # WRONG DATASET just for compatibility testing purposes
 
 export EXPERIMENT_NAME='imagenet128_baseline'
-export OUTPUT_DIR=/home/lfowl/Desktop/sagan_imgs/${EXPERIMENT_NAME}
+export OUTPUT_DIR=/home/lfowl/Desktop/SAGAN/${EXPERIMENT_NAME}
 export DATA_DIR=/home/lfowl/data
 
 export BATCH_SIZE=16

@@ -23,6 +23,11 @@ import functools
 
 from absl import flags
 import tensorflow as tf  # tf
+# following 3 lines added by lf
+import resource
+low, high = resource.getrlimit(resource.RLIMIT_NOFILE)
+resource.setrlimit(resource.RLIMIT_NOFILE, (high, high))
+
 import tensorflow_datasets as tfds
 
 from tensorflow_gan.examples import compat_utils
