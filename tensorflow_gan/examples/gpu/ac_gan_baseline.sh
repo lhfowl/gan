@@ -2,8 +2,8 @@
 # WRONG DATASET just for compatibility testing purposes
 
 export EXPERIMENT_NAME='imagenet128_acbaseline'
-export OUTPUT_DIR=/home/lfowl/Desktop/SAGAN/${EXPERIMENT_NAME}
-export DATA_DIR=/home/lfowl/data
+export OUTPUT_DIR=/cmlscratch/lfowl//SAGAN/${EXPERIMENT_NAME}
+export DATA_DIR=/cmlscratch/lfowl/data
 
 export BATCH_SIZE=16
 export DATASET_ARGS='--image_size=128 --dataset_name=imagenet2012 --num_classes=1000 --dataset_val_split_name=validation'
