@@ -2,7 +2,7 @@
 # WRONG DATASET just for compatibility testing purposes
 
 export EXPERIMENT_NAME='imagenet128_acbaseline'
-export OUTPUT_DIR=/cmlscratch/lfowl//SAGAN/${EXPERIMENT_NAME}
+export OUTPUT_DIR=/cmlscratch/lfowl/SAGAN/${EXPERIMENT_NAME}
 export DATA_DIR=/cmlscratch/lfowl/data
 
 export BATCH_SIZE=16
